@@ -1,0 +1,6 @@
+{
+  "name": "Sohom Enterprises",
+  "description": "Professional home appliance service, repair, maintenance, and spare parts sales platform.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

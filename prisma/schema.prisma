@@ -1,0 +1,423 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  TECHNICIAN
+  ADMIN
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  TECHNICIAN_ASSIGNED
+  ON_THE_WAY
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FLAT
+}
+
+enum NotificationType {
+  BOOKING_UPDATE
+  ORDER_UPDATE
+  SYSTEM
+  PROMOTIONAL
+}
+
+// 1. User System
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  phone         String?   @unique
+  passwordHash  String?
+  role          Role      @default(CUSTOMER)
+  image         String?
+  emailVerified Boolean   @default(false)
+  phoneVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  addresses         Address[]
+  technicianProfile Technician?
+  bookings          ServiceBooking[]
+  cart              Cart?
+  orders            Order[]
+  reviews           Review[]
+  notifications     Notification[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+}
+
+// 2. Addresses
+model Address {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName     String
+  phone        String
+  addressLine1 String
+  addressLine2 String?
+  city         String
+  state        String
+  pincode      String
+  landmark     String?
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  bookings ServiceBooking[]
+  orders   Order[]
+
+  @@index([userId])
+  @@index([pincode])
+}
+
+// 3. Service Categories
+model ServiceCategory {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String
+  image       String?
+  active      Boolean   @default(true)
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  services Service[]
+
+  @@index([slug])
+  @@index([active])
+}
+
+// 4. Services
+model Service {
+  id                String          @id @default(cuid())
+  categoryId        String
+  category          ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name              String
+  slug              String          @unique
+  description       String
+  shortDescription  String?
+  inspectionFee     Decimal         @db.Decimal(10, 2)
+  estimatedDuration String
+  warrantyDays      Int             @default(30)
+  active            Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  bookings ServiceBooking[]
+  reviews  Review[]
+
+  @@index([categoryId])
+  @@index([slug])
+  @@index([active])
+}
+
+// 5. Technicians
+model Technician {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employeeCode String   @unique
+  skills       String[]
+  serviceAreas String[]
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignedBookings ServiceBooking[]
+
+  @@index([userId])
+  @@index([employeeCode])
+  @@index([active])
+}
+
+// 6. Service Bookings
+model ServiceBooking {
+  id                 String         @id @default(cuid())
+  bookingNumber      String         @unique
+  userId             String
+  user               User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  serviceId          String
+  service            Service        @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  technicianId       String?
+  technician         Technician?    @relation(fields: [technicianId], references: [id], onDelete: SetNull)
+  addressId          String
+  address            Address        @relation(fields: [addressId], references: [id], onDelete: Restrict)
+  appliance          String
+  problemDescription String
+  preferredDate      DateTime
+  preferredTimeSlot  String
+  status             BookingStatus  @default(PENDING)
+  estimatedAmount    Decimal        @db.Decimal(10, 2)
+  finalAmount        Decimal?       @db.Decimal(10, 2)
+  technicianNotes    String?
+  customerNotes      String?
+  completedAt        DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  @@index([bookingNumber])
+  @@index([userId])
+  @@index([serviceId])
+  @@index([technicianId])
+  @@index([status])
+  @@index([preferredDate])
+}
+
+// 7. Product Categories
+model ProductCategory {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  image       String?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  products Product[]
+
+  @@index([slug])
+  @@index([active])
+}
+
+// 8. Products
+model Product {
+  id                String          @id @default(cuid())
+  categoryId        String
+  category          ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name              String
+  slug              String          @unique
+  sku               String          @unique
+  brand             String
+  description       String
+  specifications    Json
+  compatibility     String[]
+  price             Decimal         @db.Decimal(10, 2)
+  salePrice         Decimal?        @db.Decimal(10, 2)
+  stockQuantity     Int             @default(0)
+  lowStockThreshold Int             @default(5)
+  active            Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  images     ProductImage[]
+  cartItems  CartItem[]
+  orderItems OrderItem[]
+  reviews    Review[]
+
+  @@index([categoryId])
+  @@index([slug])
+  @@index([sku])
+  @@index([brand])
+  @@index([active])
+}
+
+// 9. Product Images
+model ProductImage {
+  id        String   @id @default(cuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  altText   String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@index([sortOrder])
+}
+
+// 10. Cart and Cart Items
+model Cart {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items CartItem[]
+
+  @@index([userId])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+  @@index([cartId])
+  @@index([productId])
+}
+
+// 11. Orders and Order Items
+model Order {
+  id             String      @id @default(cuid())
+  orderNumber    String      @unique
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  addressId      String
+  address        Address     @relation(fields: [addressId], references: [id], onDelete: Restrict)
+  subtotal       Decimal     @db.Decimal(10, 2)
+  shippingAmount Decimal     @default(0.00) @db.Decimal(10, 2)
+  discountAmount Decimal     @default(0.00) @db.Decimal(10, 2)
+  totalAmount    Decimal     @db.Decimal(10, 2)
+  status         OrderStatus @default(PENDING)
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  items    OrderItem[]
+  payments Payment[]
+
+  @@index([orderNumber])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id                  String   @id @default(cuid())
+  orderId             String
+  order               Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId           String
+  product             Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productNameSnapshot String
+  skuSnapshot         String
+  price               Decimal  @db.Decimal(10, 2)
+  quantity            Int
+  total               Decimal  @db.Decimal(10, 2)
+  createdAt           DateTime @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+// 12. Payments
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  provider          String
+  providerOrderId   String
+  providerPaymentId String?
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("INR")
+  status            PaymentStatus @default(PENDING)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([orderId])
+  @@index([providerOrderId])
+  @@index([status])
+}
+
+// 13. Reviews
+model Review {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  serviceId String?
+  service   Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  rating    Int
+  title     String?
+  comment   String
+  verified  Boolean  @default(false)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([productId])
+  @@index([serviceId])
+  @@index([active])
+}
+
+// 14. Coupons
+model Coupon {
+  id                 String       @id @default(cuid())
+  code               String       @unique
+  description        String
+  discountType       DiscountType
+  discountValue      Decimal      @db.Decimal(10, 2)
+  minimumOrderAmount Decimal      @default(0.00) @db.Decimal(10, 2)
+  maximumDiscount    Decimal?     @db.Decimal(10, 2)
+  usageLimit         Int?
+  usedCount          Int          @default(0)
+  startsAt           DateTime
+  expiresAt          DateTime
+  active             Boolean      @default(true)
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([code])
+  @@index([active])
+}
+
+// 15. Notifications
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      NotificationType @default(SYSTEM)
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+// 16. Password Reset Token
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  email     String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([token])
+}
+
