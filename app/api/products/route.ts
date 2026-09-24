@@ -1,9 +1,17 @@
-import { getProducts, getProductBySlug } from '../../../actions/products.ts';
+import { getProducts, getProductBySlug, getProductById } from '../../../actions/products.ts';
 
 export async function handleGetProducts(reqQuery: Record<string, any>) {
   try {
     if (reqQuery.slug) {
       const product = await getProductBySlug(String(reqQuery.slug));
+      if (!product) {
+        return { status: 404, body: { error: 'Product not found' } };
+      }
+      return { status: 200, body: product };
+    }
+
+    if (reqQuery.id) {
+      const product = await getProductById(String(reqQuery.id));
       if (!product) {
         return { status: 404, body: { error: 'Product not found' } };
       }
@@ -25,6 +33,13 @@ export async function handleGetProducts(reqQuery: Record<string, any>) {
 
     return { status: 200, body: data };
   } catch (error: any) {
-    return { status: 400, body: { error: error.message || 'Failed to fetch products' } };
+    // Zod validation errors are the caller's fault (400); anything else is a
+    // real server/database problem (500) and should not be disguised as a
+    // successful empty response.
+    const isValidationError = error?.name === 'ZodError';
+    return {
+      status: isValidationError ? 400 : 500,
+      body: { error: isValidationError ? error.message : 'Failed to fetch products. Please try again shortly.' },
+    };
   }
 }

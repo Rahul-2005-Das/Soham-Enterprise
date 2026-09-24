@@ -3,8 +3,9 @@
 // and enforces role boundaries.
 
 import jwt from 'jsonwebtoken';
+import { getRequiredEnv } from '../lib/env.ts';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'sohom-enterprises-secure-token-secret-key-2026';
+const JWT_SECRET = getRequiredEnv('JWT_SECRET');
 
 export interface AuthSession {
   userId: string;

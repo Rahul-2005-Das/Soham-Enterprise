@@ -1,18 +1,27 @@
 import { PrismaClient } from '@prisma/client';
 
+/**
+ * Normalizes DATABASE_URL so a password containing special characters
+ * (like '@', '#', '%') doesn't break URL parsing, without hardcoding any
+ * specific credential in source code. Percent-encodes the password segment
+ * of postgresql://user:password@host:port/db generically.
+ */
 function getNormalizedDatabaseUrl(): string | undefined {
-  let url = process.env.DATABASE_URL;
+  const url = process.env.DATABASE_URL;
   if (!url) return undefined;
 
-  // Correct typo in password (sohom -> soham) and percent-encode '@' in password
-  if (url.includes('sohom@2011halder')) {
-    url = url.replace('sohom@2011halder', 'soham%402011halder');
-  } else if (url.includes('soham@2011halder')) {
-    url = url.replace('soham@2011halder', 'soham%402011halder');
-  }
+  const match = url.match(/^(postgres(?:ql)?:\/\/)([^:@/]+):([^@]+)@(.+)$/);
+  if (!match) return url;
 
-  // Use port 5432 for standard direct pooler connection if port 6543 has pgbouncer transaction latency
-  return url;
+  const [, scheme, user, rawPassword, rest] = match;
+  // Only re-encode if the password contains characters that are unsafe in a URL
+  // but isn't already percent-encoded (avoids double-encoding a correct URL).
+  const alreadyEncoded = /%[0-9A-Fa-f]{2}/.test(rawPassword);
+  const needsEncoding = /[@#/?[\]]/.test(rawPassword);
+  if (!needsEncoding || alreadyEncoded) return url;
+
+  const encodedPassword = encodeURIComponent(rawPassword);
+  return `${scheme}${user}:${encodedPassword}@${rest}`;
 }
 
 const globalForPrisma = globalThis as unknown as {

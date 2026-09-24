@@ -13,8 +13,9 @@ import {
   CreateStaffInput,
 } from '../schemas/user';
 import { AuthSession } from './auth-helper';
+import { getRequiredEnv } from '../lib/env';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'sohom-enterprises-secure-token-secret-key-2026';
+const JWT_SECRET = getRequiredEnv('JWT_SECRET');
 const JWT_EXPIRES_IN = '7d';
 
 export interface SafeUser {

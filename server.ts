@@ -7,7 +7,8 @@ import { handleGetProducts } from './app/api/products/route.ts';
 import { handleGetProductCategories } from './app/api/product-categories/route.ts';
 import { handleCreateBooking, handleGetUserBookings } from './app/api/bookings/route.ts';
 import { handleGetCart, handleAddToCart, handleUpdateCart, handleDeleteCartItem } from './app/api/cart/route.ts';
-import { handleGetUserOrders } from './app/api/orders/route.ts';
+import { handleGetUserOrders, handleCreateOrder } from './app/api/orders/route.ts';
+import { handleGetCheckoutConfig } from './app/api/config/route.ts';
 import {
   handleRegister,
   handleLogin,
@@ -244,6 +245,18 @@ app.delete('/api/cart', async (req: Request, res: Response) => {
 // Orders API (Protected)
 app.get('/api/orders', async (req: Request, res: Response) => {
   const result = await handleGetUserOrders(req);
+  res.status(result.status).json(result.body);
+});
+
+// Checkout (Protected) - creates a real order from the user's cart
+app.post('/api/orders', async (req: Request, res: Response) => {
+  const result = await handleCreateOrder(req.body, req);
+  res.status(result.status).json(result.body);
+});
+
+// Public checkout config (shipping rule + UPI details)
+app.get('/api/config/checkout', async (req: Request, res: Response) => {
+  const result = await handleGetCheckoutConfig();
   res.status(result.status).json(result.body);
 });
 
