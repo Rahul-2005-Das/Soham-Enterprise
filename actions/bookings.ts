@@ -155,25 +155,20 @@ export async function getCurrentUserBookings(authenticatedSessionToken?: string)
   // Enforce authentication check
   const auth = requireAuthUser(authenticatedSessionToken);
 
-  try {
-    const bookings = await prisma.serviceBooking.findMany({
-      where: { userId: auth.userId },
-      include: {
-        service: true,
-        address: true,
-        technician: {
-          include: {
-            user: {
-              select: { name: true, phone: true, image: true },
-            },
+  const bookings = await prisma.serviceBooking.findMany({
+    where: { userId: auth.userId },
+    include: {
+      service: true,
+      address: true,
+      technician: {
+        include: {
+          user: {
+            select: { name: true, phone: true, image: true },
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
-    });
-    return bookings;
-  } catch (error) {
-    console.warn(`[actions/bookings] Failed to fetch bookings for user ${auth.userId}:`, error);
-    return [];
-  }
+    },
+    orderBy: { createdAt: 'desc' },
+  });
+  return bookings;
 }

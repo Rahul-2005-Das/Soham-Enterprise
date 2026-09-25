@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   User,
   Mail,
@@ -17,12 +17,15 @@ import {
   ShieldAlert,
   ArrowRight,
   Check,
+  Package,
+  ShoppingBag,
 } from 'lucide-react';
 import { PageRoute, UserAddress } from '../types';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { useAuth } from '../context/AuthContext';
+import { api, ApiError } from '../lib/api';
 
 interface ProfilePageProps {
   onNavigate: (page: PageRoute) => void;
@@ -31,7 +34,58 @@ interface ProfilePageProps {
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
   const { user, logout, updateProfile, changePassword, addAddress, deleteAddress, setDefaultAddress } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'addresses' | 'security'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'addresses' | 'orders' | 'bookings' | 'security'>('profile');
+
+  // Orders tab: lazily fetched the first time the tab is opened
+  const [orders, setOrders] = useState<any[] | null>(null);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+
+  // Bookings tab: lazily fetched the first time the tab is opened
+  const [bookings, setBookings] = useState<any[] | null>(null);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTab === 'orders' && orders === null && !ordersLoading) {
+      setOrdersLoading(true);
+      setOrdersError(null);
+      api
+        .get<any[]>('/api/orders')
+        .then(setOrders)
+        .catch((err) => setOrdersError(err instanceof ApiError ? err.message : 'Could not load your orders.'))
+        .finally(() => setOrdersLoading(false));
+    }
+    if (activeTab === 'bookings' && bookings === null && !bookingsLoading) {
+      setBookingsLoading(true);
+      setBookingsError(null);
+      api
+        .get<any[]>('/api/bookings')
+        .then(setBookings)
+        .catch((err) => setBookingsError(err instanceof ApiError ? err.message : 'Could not load your bookings.'))
+        .finally(() => setBookingsLoading(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  const ORDER_STATUS_STYLES: Record<string, string> = {
+    PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
+    CONFIRMED: 'bg-blue-50 text-blue-700 border-blue-200',
+    PROCESSING: 'bg-blue-50 text-blue-700 border-blue-200',
+    SHIPPED: 'bg-sky-50 text-sky-700 border-sky-200',
+    DELIVERED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    CANCELLED: 'bg-rose-50 text-rose-700 border-rose-200',
+  };
+
+  const BOOKING_STATUS_STYLES: Record<string, string> = {
+    PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
+    CONFIRMED: 'bg-blue-50 text-blue-700 border-blue-200',
+    TECHNICIAN_ASSIGNED: 'bg-blue-50 text-blue-700 border-blue-200',
+    ON_THE_WAY: 'bg-sky-50 text-sky-700 border-sky-200',
+    IN_PROGRESS: 'bg-sky-50 text-sky-700 border-sky-200',
+    COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    CANCELLED: 'bg-rose-50 text-rose-700 border-rose-200',
+  };
 
   // Profile Edit State
   const [name, setName] = useState(user?.name || '');
@@ -280,6 +334,26 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
             }`}
           >
             <MapPin className="w-3.5 h-3.5" /> Saved Addresses ({user.addresses?.length || 0})
+          </button>
+          <button
+            onClick={() => setActiveTab('orders')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+              activeTab === 'orders'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200/60'
+            }`}
+          >
+            <ShoppingBag className="w-3.5 h-3.5" /> My Orders
+          </button>
+          <button
+            onClick={() => setActiveTab('bookings')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 ${
+              activeTab === 'bookings'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-600 hover:bg-slate-200/60'
+            }`}
+          >
+            <Wrench className="w-3.5 h-3.5" /> My Bookings
           </button>
           <button
             onClick={() => setActiveTab('security')}
@@ -587,6 +661,127 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
         )}
 
         {/* Tab 3: Security & Password */}
+        {/* Tab: My Orders */}
+        {activeTab === 'orders' && (
+          <Card className="p-6 border-slate-200">
+            {ordersLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-20 rounded-xl bg-slate-100 animate-pulse" />
+                ))}
+              </div>
+            ) : ordersError ? (
+              <div className="text-center py-10">
+                <AlertCircle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
+                <p className="text-sm text-slate-600">{ordersError}</p>
+              </div>
+            ) : !orders || orders.length === 0 ? (
+              <div className="text-center py-10">
+                <ShoppingBag className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-900">No orders yet</p>
+                <p className="text-xs text-slate-500 mt-1">Spare parts you order will show up here.</p>
+                <Button variant="primary" size="sm" className="mt-4" onClick={() => onNavigate('spare-parts')}>
+                  Browse Spare Parts
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {orders.map((order) => (
+                  <div key={order.id} className="p-4 rounded-xl border border-slate-200">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{order.orderNumber}</p>
+                        <p className="text-[11px] text-slate-400">
+                          {new Date(order.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                          ORDER_STATUS_STYLES[order.status] || 'bg-slate-50 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        {String(order.status).replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-600 space-y-1 mb-2">
+                      {order.items?.map((item: any) => (
+                        <p key={item.id}>
+                          {item.quantity} × {item.productNameSnapshot || item.product?.name}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                      <span className="text-slate-500">
+                        Payment: {order.payments?.[0]?.provider === 'UPI_QR' ? 'UPI' : 'Cash on Delivery'}
+                        {' · '}
+                        {order.payments?.[0]?.status || 'PENDING'}
+                      </span>
+                      <span className="font-bold text-slate-900">₹{Number(order.totalAmount)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
+        {/* Tab: My Bookings */}
+        {activeTab === 'bookings' && (
+          <Card className="p-6 border-slate-200">
+            {bookingsLoading ? (
+              <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="h-20 rounded-xl bg-slate-100 animate-pulse" />
+                ))}
+              </div>
+            ) : bookingsError ? (
+              <div className="text-center py-10">
+                <AlertCircle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
+                <p className="text-sm text-slate-600">{bookingsError}</p>
+              </div>
+            ) : !bookings || bookings.length === 0 ? (
+              <div className="text-center py-10">
+                <Wrench className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-semibold text-slate-900">No service bookings yet</p>
+                <p className="text-xs text-slate-500 mt-1">Book a doorstep repair or service to see it here.</p>
+                <Button variant="primary" size="sm" className="mt-4" onClick={() => onNavigate('services')}>
+                  Browse Services
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {bookings.map((booking) => (
+                  <div key={booking.id} className="p-4 rounded-xl border border-slate-200">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                      <div>
+                        <p className="text-sm font-bold text-slate-900">{booking.service?.name || booking.appliance}</p>
+                        <p className="text-[11px] text-slate-400">
+                          {booking.bookingNumber} ·{' '}
+                          {new Date(booking.preferredDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {booking.preferredTimeSlot ? ` · ${booking.preferredTimeSlot}` : ''}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+                          BOOKING_STATUS_STYLES[booking.status] || 'bg-slate-50 text-slate-700 border-slate-200'
+                        }`}
+                      >
+                        {String(booking.status).replace(/_/g, ' ')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 mb-1">{booking.problemDescription}</p>
+                    {booking.technician?.user?.name && (
+                      <p className="text-[11px] text-slate-500">
+                        Technician: <span className="font-semibold text-slate-700">{booking.technician.user.name}</span>
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Card>
+        )}
+
         {activeTab === 'security' && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="p-6 md:col-span-2 border-slate-200 space-y-5">
