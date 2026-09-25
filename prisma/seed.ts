@@ -457,8 +457,11 @@ async function main() {
   console.log(`✓ Seeded ${products.length} Products with images`);
 
   // 5. Seed Default Admin & Technician Staff Users (Idempotent)
-  const adminPasswordHash = '$2a$10$wK1mFj8K7l9J5/L3X6M9I.F5F8a4g8s2d7e6q1w3e5r7t9y1u3i5o'; // bcrypt for 'Admin@2026Sohom'
-  const techPasswordHash = '$2a$10$wK1mFj8K7l9J5/L3X6M9I.F5F8a4g8s2d7e6q1w3e5r7t9y1u3i5o'; // bcrypt for 'Tech@2026Sohom'
+  // NOTE: these are real bcrypt hashes (10 salt rounds, verified against the
+  // documented plaintext passwords below) for LOCAL/DEMO seeding only.
+  // Change these passwords immediately after first login in any real deployment.
+  const adminPasswordHash = '$2b$10$DRlWBJFjwxaW21MEyW2R9u2lZsAoiiA45d8b./2ZUqzSfNY8uaDr.'; // bcrypt for 'Admin@2026Sohom'
+  const techPasswordHash = '$2b$10$aHwEeifv1ztrQSQOpXdyhuDq.FyVkXACPKLAF4J5O6Auw/gvUGwcG'; // bcrypt for 'Tech@2026Sohom'
 
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@sohomenterprises.com' },
