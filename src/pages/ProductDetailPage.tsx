@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Star,
   ShieldCheck,
@@ -14,7 +14,9 @@ import {
   Award
 } from 'lucide-react';
 import { PageRoute, SparePartProduct } from '../types';
-import { SPARE_PARTS_LIST } from '../data/mockData';
+import { useCatalog } from '../context/CatalogContext';
+import { api, ApiError } from '../lib/api';
+import { ApiProduct, mapApiProductToSparePart } from '../lib/productMapper';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -32,27 +34,86 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   onAddToCartWithQty,
   onBuyNowWithQty
 }) => {
-  const product =
-    SPARE_PARTS_LIST.find((p) => p.id === productId) || SPARE_PARTS_LIST[0];
+  const { products: catalogProducts } = useCatalog();
+  const [product, setProduct] = useState<SparePartProduct | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!productId) {
+      setLoading(false);
+      setLoadError('No product specified.');
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    api
+      .get<ApiProduct>(`/api/products?id=${encodeURIComponent(productId)}`)
+      .then((data) => {
+        if (!cancelled) setProduct(mapApiProductToSparePart(data));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const message =
+          err instanceof ApiError && err.status === 404
+            ? 'This product could not be found. It may have been removed.'
+            : 'Could not load this product. Please try again.';
+        setLoadError(message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [productId]);
 
   const [quantity, setQuantity] = useState(1);
   const [selectedTab, setSelectedTab] = useState<'specs' | 'compatibility' | 'warranty'>('specs');
   const [addedToast, setAddedToast] = useState(false);
 
-  // Related products from same category or fallback
-  const relatedProducts = SPARE_PARTS_LIST.filter(
-    (p) => p.id !== product.id && (p.category === product.category || true)
-  ).slice(0, 3);
+  useEffect(() => {
+    setQuantity(1);
+  }, [productId]);
+
+  // Related products from same category, sourced from the shared catalog
+  const relatedProducts = product
+    ? catalogProducts.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 3)
+    : [];
 
   const handleAddToCart = () => {
+    if (!product) return;
     onAddToCartWithQty(product.id, quantity);
     setAddedToast(true);
     setTimeout(() => setAddedToast(false), 2500);
   };
 
   const handleBuyNow = () => {
+    if (!product) return;
     onBuyNowWithQty(product.id, quantity);
   };
+
+  if (loading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50 items-center justify-center py-24">
+        <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (loadError || !product) {
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50 items-center justify-center py-24 px-4 text-center">
+        <h2 className="text-lg font-bold text-slate-900 mb-2">
+          {loadError || 'Product not found'}
+        </h2>
+        <Button variant="primary" size="sm" onClick={() => onNavigate('spare-parts')}>
+          Browse Spare Parts
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
@@ -134,30 +195,38 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 </h1>
 
                 {/* Rating */}
-                <div className="flex items-center gap-2 mt-3">
-                  <div className="flex items-center gap-1 text-amber-500">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={`w-4 h-4 ${
-                          i < Math.floor(product.rating) ? 'fill-current' : 'text-slate-300'
-                        }`}
-                      />
-                    ))}
+                {product.reviewCount > 0 ? (
+                  <div className="flex items-center gap-2 mt-3">
+                    <div className="flex items-center gap-1 text-amber-500">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-4 h-4 ${
+                            i < Math.floor(product.rating) ? 'fill-current' : 'text-slate-300'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-xs font-bold text-slate-900">{product.rating}</span>
+                    <span className="text-xs text-slate-400">({product.reviewCount} customer reviews)</span>
                   </div>
-                  <span className="text-xs font-bold text-slate-900">{product.rating}</span>
-                  <span className="text-xs text-slate-400">({product.reviewCount} customer reviews)</span>
-                </div>
+                ) : (
+                  <p className="text-xs text-slate-400 mt-3">No reviews yet - be the first to review this part.</p>
+                )}
               </div>
 
               {/* Price Block */}
-              <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100 flex items-baseline gap-3">
+              <div className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100 flex items-baseline gap-3 flex-wrap">
                 <span className="text-3xl font-black text-slate-900">₹{product.price}</span>
-                <span className="text-sm text-slate-400 line-through">₹{product.originalPrice}</span>
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
-                  Save ₹{product.originalPrice - product.price} (
-                  {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF)
-                </span>
+                {product.originalPrice > product.price && (
+                  <>
+                    <span className="text-sm text-slate-400 line-through">₹{product.originalPrice}</span>
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                      Save ₹{product.originalPrice - product.price} (
+                      {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF)
+                    </span>
+                  </>
+                )}
               </div>
 
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
@@ -331,7 +400,9 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   </h4>
                   <div className="mt-2 flex items-baseline gap-2">
                     <span className="text-sm font-extrabold text-slate-900">₹{rel.price}</span>
-                    <span className="text-xs text-slate-400 line-through">₹{rel.originalPrice}</span>
+                    {rel.originalPrice > rel.price && (
+                      <span className="text-xs text-slate-400 line-through">₹{rel.originalPrice}</span>
+                    )}
                   </div>
                 </div>
 

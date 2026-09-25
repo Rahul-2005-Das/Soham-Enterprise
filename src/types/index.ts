@@ -5,6 +5,7 @@ export type PageRoute =
   | 'service-detail' 
   | 'spare-parts' 
   | 'product-detail' 
+  | 'checkout'
   | 'contact' 
   | 'faq' 
   | 'login' 

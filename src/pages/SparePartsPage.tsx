@@ -13,7 +13,7 @@ import {
   ArrowUpDown
 } from 'lucide-react';
 import { PageRoute, SparePartProduct } from '../types';
-import { SPARE_PARTS_LIST } from '../data/mockData';
+import { useCatalog } from '../context/CatalogContext';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -37,21 +37,22 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
   const [sortBy, setSortBy] = useState<'popularity' | 'price-low' | 'price-high' | 'rating'>('popularity');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  const { products, loading, error } = useCatalog();
 
   const itemsPerPage = 6;
 
   // Extract distinct categories and brands
   const categories = useMemo(() => {
-    return ['All', ...Array.from(new Set(SPARE_PARTS_LIST.map((p) => p.category)))];
-  }, []);
+    return ['All', ...Array.from(new Set(products.map((p) => p.category)))];
+  }, [products]);
 
   const brands = useMemo(() => {
-    return ['All', ...Array.from(new Set(SPARE_PARTS_LIST.map((p) => p.brand.split('/')[0].trim())))];
-  }, []);
+    return ['All', ...Array.from(new Set(products.map((p) => p.brand.split('/')[0].trim())))];
+  }, [products]);
 
   // Filtered and sorted products
   const filteredProducts = useMemo(() => {
-    return SPARE_PARTS_LIST.filter((product) => {
+    return products.filter((product) => {
       // Search
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
@@ -90,7 +91,7 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
       if (sortBy === 'rating') return b.rating - a.rating;
       return b.reviewCount - a.reviewCount; // Popularity
     });
-  }, [searchQuery, selectedCategory, selectedBrand, priceMax, inStockOnly, sortBy]);
+  }, [products, searchQuery, selectedCategory, selectedBrand, priceMax, inStockOnly, sortBy]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage) || 1;
@@ -223,7 +224,7 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
                     <span>{cat}</span>
                     {cat !== 'All' && (
                       <span className="text-[10px] text-slate-400">
-                        {SPARE_PARTS_LIST.filter((p) => p.category === cat).length}
+                        {products.filter((p) => p.category === cat).length}
                       </span>
                     )}
                   </button>
@@ -301,18 +302,35 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
 
           {/* Product Cards Grid Area */}
           <div className="lg:col-span-9 space-y-8">
-            {paginatedProducts.length === 0 ? (
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="h-80 rounded-2xl bg-white border border-slate-200 animate-pulse" />
+                ))}
+              </div>
+            ) : error ? (
+              <Card className="text-center py-16 p-6">
+                <h3 className="text-base font-bold text-slate-900">Couldn't load spare parts</h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">{error}</p>
+              </Card>
+            ) : paginatedProducts.length === 0 ? (
               <Card className="text-center py-16 p-6">
                 <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-500 mx-auto flex items-center justify-center mb-3">
                   <ShoppingBag className="w-8 h-8" />
                 </div>
-                <h3 className="text-base font-bold text-slate-900">No matching spare parts found</h3>
+                <h3 className="text-base font-bold text-slate-900">
+                  {products.length === 0 ? 'No spare parts available yet' : 'No matching spare parts found'}
+                </h3>
                 <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                  Try adjusting your search terms, changing the category filter, or increasing the max price.
+                  {products.length === 0
+                    ? 'Check back soon - the catalog is being stocked.'
+                    : 'Try adjusting your search terms, changing the category filter, or increasing the max price.'}
                 </p>
-                <Button variant="outline" size="sm" className="mt-4" onClick={handleResetFilters}>
-                  Clear All Filters
-                </Button>
+                {products.length > 0 && (
+                  <Button variant="outline" size="sm" className="mt-4" onClick={handleResetFilters}>
+                    Clear All Filters
+                  </Button>
+                )}
               </Card>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -350,11 +368,15 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
 
                       {/* Ratings & SKU */}
                       <div className="flex items-center justify-between text-xs mb-1.5">
-                        <div className="flex items-center gap-1 text-amber-500 font-bold">
-                          <Star className="w-3.5 h-3.5 fill-current" />
-                          <span className="text-slate-800">{part.rating}</span>
-                          <span className="text-[10px] text-slate-400 font-normal">({part.reviewCount})</span>
-                        </div>
+                        {part.reviewCount > 0 ? (
+                          <div className="flex items-center gap-1 text-amber-500 font-bold">
+                            <Star className="w-3.5 h-3.5 fill-current" />
+                            <span className="text-slate-800">{part.rating}</span>
+                            <span className="text-[10px] text-slate-400 font-normal">({part.reviewCount})</span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 font-medium">No reviews yet</span>
+                        )}
                         <span className="text-[10px] text-slate-400 font-medium">SKU: {part.sku}</span>
                       </div>
 
@@ -374,10 +396,14 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
                       {/* Pricing */}
                       <div className="mt-3 flex items-baseline gap-2">
                         <span className="text-lg font-black text-slate-900">₹{part.price}</span>
-                        <span className="text-xs text-slate-400 line-through">₹{part.originalPrice}</span>
-                        <span className="text-[10px] font-bold text-emerald-600">
-                          {Math.round(((part.originalPrice - part.price) / part.originalPrice) * 100)}% OFF
-                        </span>
+                        {part.originalPrice > part.price && (
+                          <>
+                            <span className="text-xs text-slate-400 line-through">₹{part.originalPrice}</span>
+                            <span className="text-[10px] font-bold text-emerald-600">
+                              {Math.round(((part.originalPrice - part.price) / part.originalPrice) * 100)}% OFF
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
 

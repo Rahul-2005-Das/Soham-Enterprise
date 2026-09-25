@@ -21,7 +21,8 @@ import {
   Zap
 } from 'lucide-react';
 import { PageRoute } from '../types';
-import { SERVICES_LIST, SPARE_PARTS_LIST, TESTIMONIALS, FAQS_LIST, COMPANY_INFO } from '../data/mockData';
+import { SERVICES_LIST, TESTIMONIALS, FAQS_LIST, COMPANY_INFO } from '../data/mockData';
+import { useCatalog } from '../context/CatalogContext';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
@@ -39,6 +40,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onAddToCart
 }) => {
   const [selectedHeroAppliance, setSelectedHeroAppliance] = useState(SERVICES_LIST[0].id);
+  const { products: catalogProducts, loading: productsLoading } = useCatalog();
 
   // Helper icon mapper
   const renderApplianceIcon = (name: string, className = "w-6 h-6") => {
@@ -391,8 +393,19 @@ export const HomePage: React.FC<HomePageProps> = ({
         subtitle="Authentic replacement filters, relays, remotes, pumps, and heating coils delivered straight to your doorstep."
         background="light"
       >
+        {productsLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-72 rounded-2xl bg-white border border-slate-200/80 animate-pulse" />
+            ))}
+          </div>
+        ) : catalogProducts.length === 0 ? (
+          <p className="text-center text-sm text-slate-500 py-8">
+            The spare parts catalog is being stocked - check back soon.
+          </p>
+        ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {SPARE_PARTS_LIST.slice(0, 4).map((part) => (
+          {catalogProducts.slice(0, 4).map((part) => (
             <Card
               key={part.id}
               hoverEffect
@@ -422,11 +435,15 @@ export const HomePage: React.FC<HomePageProps> = ({
                   )}
                 </div>
 
-                <div className="flex items-center gap-1 text-amber-500 mb-1">
-                  <Star className="w-3.5 h-3.5 fill-current" />
-                  <span className="text-xs font-bold text-slate-800">{part.rating}</span>
-                  <span className="text-[10px] text-slate-400">({part.reviewCount})</span>
-                </div>
+                {part.reviewCount > 0 ? (
+                  <div className="flex items-center gap-1 text-amber-500 mb-1">
+                    <Star className="w-3.5 h-3.5 fill-current" />
+                    <span className="text-xs font-bold text-slate-800">{part.rating}</span>
+                    <span className="text-[10px] text-slate-400">({part.reviewCount})</span>
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-slate-400 mb-1">No reviews yet</p>
+                )}
 
                 <h4
                   className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 transition line-clamp-2 cursor-pointer"
@@ -438,10 +455,14 @@ export const HomePage: React.FC<HomePageProps> = ({
 
                 <div className="mt-3 flex items-baseline gap-2">
                   <span className="text-lg font-black text-slate-900">₹{part.price}</span>
-                  <span className="text-xs text-slate-400 line-through">₹{part.originalPrice}</span>
-                  <span className="text-[10px] font-bold text-emerald-600">
-                    {Math.round(((part.originalPrice - part.price) / part.originalPrice) * 100)}% OFF
-                  </span>
+                  {part.originalPrice > part.price && (
+                    <>
+                      <span className="text-xs text-slate-400 line-through">₹{part.originalPrice}</span>
+                      <span className="text-[10px] font-bold text-emerald-600">
+                        {Math.round(((part.originalPrice - part.price) / part.originalPrice) * 100)}% OFF
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -466,6 +487,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </Card>
           ))}
         </div>
+        )}
 
         <div className="text-center mt-10">
           <Button
