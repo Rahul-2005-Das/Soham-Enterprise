@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { PageRoute, CartItem } from './types';
-import { SPARE_PARTS_LIST } from './data/mockData';
-import { AuthProvider } from './context/AuthContext';
+import { PageRoute } from './types';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { CatalogProvider } from './context/CatalogContext';
+import { CartProvider, useCart } from './context/CartContext';
+import { ToastProvider, useToast } from './context/ToastContext';
 import { TopBar } from './components/layout/TopBar';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
@@ -13,6 +15,7 @@ import { ServicesPage } from './pages/ServicesPage';
 import { ServiceDetailPage } from './pages/ServiceDetailPage';
 import { SparePartsPage } from './pages/SparePartsPage';
 import { ProductDetailPage } from './pages/ProductDetailPage';
+import { CheckoutPage } from './pages/CheckoutPage';
 import { ContactPage } from './pages/ContactPage';
 import { FAQPage } from './pages/FAQPage';
 import { LoginPage } from './pages/LoginPage';
@@ -28,20 +31,15 @@ function AppContent() {
   const [selectedProductId, setSelectedProductId] = useState<string | undefined>(undefined);
   const [activeResetToken, setActiveResetToken] = useState<string>('');
 
-  // Cart state management
-  const [cartItems, setCartItems] = useState<CartItem[]>([
-    {
-      product: SPARE_PARTS_LIST[0],
-      quantity: 1
-    }
-  ]);
+  const { user } = useAuth();
+  const cart = useCart();
+  const { showToast } = useToast();
+
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
 
   // Booking modal state management
   const [isBookingOpen, setIsBookingOpen] = useState<boolean>(false);
   const [bookingServiceId, setBookingServiceId] = useState<string | undefined>(undefined);
-
-  const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
 
   // Navigation handler
   const handleNavigate = (
@@ -55,43 +53,41 @@ function AppContent() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Cart actions
-  const handleAddToCart = (productId: string, quantity = 1) => {
-    const product = SPARE_PARTS_LIST.find((p) => p.id === productId);
-    if (!product) return;
-
-    setCartItems((prev) => {
-      const existing = prev.find((item) => item.product.id === productId);
-      if (existing) {
-        return prev.map((item) =>
-          item.product.id === productId
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
-      }
-      return [...prev, { product, quantity }];
-    });
-  };
-
-  const handleUpdateCartQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      handleRemoveFromCart(productId);
+  // Cart actions - real backend-backed cart. A cart belongs to a logged-in
+  // user (Cart.userId is unique in the schema), so adding to cart while
+  // logged out sends the person to log in rather than faking a local cart
+  // that could never actually be checked out.
+  const handleAddToCart = async (productId: string, quantity = 1) => {
+    if (!user) {
+      showToast('Please log in to add items to your cart.', 'info');
+      handleNavigate('login');
       return;
     }
-    setCartItems((prev) =>
-      prev.map((item) =>
-        item.product.id === productId ? { ...item, quantity } : item
-      )
-    );
+    const result = await cart.addItem(productId, quantity);
+    if (!result.success) {
+      showToast(result.error || 'Could not add item to cart.', 'error');
+    } else {
+      showToast('Added to cart.', 'success');
+    }
   };
 
-  const handleRemoveFromCart = (productId: string) => {
-    setCartItems((prev) => prev.filter((item) => item.product.id !== productId));
+  // CartDrawer sends a DELTA (+1/-1), not an absolute quantity.
+  const handleUpdateCartQuantity = async (productId: string, delta: number) => {
+    const current = cart.items.find((item) => item.product.id === productId);
+    const newQuantity = (current?.quantity ?? 0) + delta;
+    const result = await cart.setItemQuantity(productId, Math.max(0, newQuantity));
+    if (!result.success) {
+      showToast(result.error || 'Could not update cart.', 'error');
+    }
+  };
+
+  const handleRemoveFromCart = async (productId: string) => {
+    await cart.removeItem(productId);
   };
 
   const handleCheckout = () => {
     setIsCartOpen(false);
-    handleOpenBooking();
+    handleNavigate('checkout');
   };
 
   const handleOpenBooking = (serviceId?: string) => {
@@ -108,7 +104,7 @@ function AppContent() {
       <Navbar
         currentPage={currentPage}
         onNavigate={handleNavigate}
-        cartCount={totalCartCount}
+        cartCount={cart.totalItems}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenBooking={(serviceId) => handleOpenBooking(serviceId)}
       />
@@ -168,6 +164,8 @@ function AppContent() {
           />
         )}
 
+        {currentPage === 'checkout' && <CheckoutPage onNavigate={handleNavigate} />}
+
         {currentPage === 'contact' && <ContactPage />}
 
         {currentPage === 'faq' && <FAQPage />}
@@ -202,7 +200,7 @@ function AppContent() {
       <CartDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
-        items={cartItems}
+        items={cart.items}
         onUpdateQuantity={handleUpdateCartQuantity}
         onRemoveItem={handleRemoveFromCart}
         onCheckout={handleCheckout}
@@ -221,7 +219,13 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <ToastProvider>
+        <CatalogProvider>
+          <CartProvider>
+            <AppContent />
+          </CartProvider>
+        </CatalogProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }

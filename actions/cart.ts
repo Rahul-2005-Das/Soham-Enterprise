@@ -45,11 +45,11 @@ export async function getCart(authenticatedSessionToken?: string) {
 
   // Drop any line items whose product was deactivated/deleted after being added,
   // so the customer never sees or is charged for something they can no longer buy.
-  const activeItems = cart.items.filter((item) => item.product && item.product.active);
+  const activeItems = cart.items.filter((item: any) => item.product && item.product.active);
 
-  const totalItems = activeItems.reduce((sum, item) => sum + item.quantity, 0);
+  const totalItems = activeItems.reduce((sum: number, item: any) => sum + item.quantity, 0);
   const subtotal = activeItems.reduce(
-    (sum, item) => sum + Number(item.product.salePrice ?? item.product.price) * item.quantity,
+    (sum: number, item: any) => sum + Number(item.product.salePrice ?? item.product.price) * item.quantity,
     0
   );
 

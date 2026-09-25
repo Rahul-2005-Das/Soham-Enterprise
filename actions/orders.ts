@@ -77,7 +77,7 @@ export async function createOrder(input: unknown, authenticatedSessionToken?: st
 
   // Re-validate every line item against live product data.
   const unavailable: string[] = [];
-  const lineItems = cart.items.map((item) => {
+  const lineItems = cart.items.map((item: any) => {
     const product = item.product;
     if (!product || !product.active) {
       unavailable.push(`"${item.product?.name ?? 'A product'}" is no longer available.`);
@@ -106,8 +106,8 @@ export async function createOrder(input: unknown, authenticatedSessionToken?: st
     throw new Error(unavailable.join(' '));
   }
 
-  const items = lineItems.filter((i): i is NonNullable<typeof i> => i !== null);
-  const subtotal = round2(items.reduce((sum, i) => sum + i.total, 0));
+  const items = lineItems.filter((i: typeof lineItems[number]): i is NonNullable<typeof i> => i !== null);
+  const subtotal = round2(items.reduce((sum: number, i: any) => sum + i.total, 0));
   const shippingAmount = calculateShipping(subtotal);
 
   // Optional coupon
@@ -141,7 +141,7 @@ export async function createOrder(input: unknown, authenticatedSessionToken?: st
   const totalAmount = round2(Math.max(0, subtotal + shippingAmount - discountAmount));
   const orderNumber = generateOrderNumber();
 
-  const order = await prisma.$transaction(async (tx) => {
+  const order = await prisma.$transaction(async (tx: any) => {
     const createdOrder = await tx.order.create({
       data: {
         orderNumber,
@@ -153,7 +153,7 @@ export async function createOrder(input: unknown, authenticatedSessionToken?: st
         totalAmount,
         status: 'PENDING',
         items: {
-          create: items.map((i) => ({
+          create: items.map((i: any) => ({
             productId: i.productId,
             productNameSnapshot: i.productNameSnapshot,
             skuSnapshot: i.skuSnapshot,
