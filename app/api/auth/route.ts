@@ -1,11 +1,15 @@
 import { Request, Response } from 'express';
+import { isZodError, zodMessage } from '../_errors.ts';
 import {
   registerUser,
   loginUser,
+  requestLoginCode,
+  verifyLoginCode,
   getCurrentUser,
   updateUserProfile,
   changeUserPassword,
   requestPasswordReset,
+  verifyResetCode,
   resetPasswordWithToken,
   adminCreateStaff,
   getUserAddresses,
@@ -17,7 +21,10 @@ import {
 import {
   registerSchema,
   loginSchema,
+  requestLoginCodeSchema,
+  verifyLoginCodeSchema,
   forgotPasswordSchema,
+  verifyResetCodeSchema,
   resetPasswordSchema,
   changePasswordSchema,
   userProfileUpdateSchema,
@@ -27,19 +34,19 @@ import {
 import { requireAuthUser, requireRole } from '../../../actions/auth-helper.ts';
 
 // Helper to set HTTP-only cookie
-export function setAuthCookie(res: Response, token: string) {
-  res.cookie('auth_token', token, {
+export function setAuthCookie(res: Response, token: string, cookieName: string = 'auth_token') {
+  res.cookie(cookieName, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    maxAge: 604800 * 1000, // Express expects milliseconds (7 days).
     path: '/',
   });
 }
 
 // Helper to clear HTTP-only cookie
-export function clearAuthCookie(res: Response) {
-  res.cookie('auth_token', '', {
+export function clearAuthCookie(res: Response, cookieName: string = 'auth_token') {
+  res.cookie(cookieName, '', {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
@@ -58,7 +65,7 @@ export async function handleRegister(body: any) {
     return { status: 201, body: { success: true, user: result.user }, token: result.token };
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return { status: 400, body: { error: error.errors[0]?.message || 'Validation error' } };
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
     }
     return { status: 400, body: { error: error.message || 'Registration failed' } };
   }
@@ -71,12 +78,45 @@ export async function handleLogin(body: any) {
   try {
     const validated = loginSchema.parse(body);
     const result = await loginUser(validated);
+    if (result.user.role !== 'CUSTOMER') {
+      return { status: 401, body: { success: false, error: 'Invalid email or password.' } };
+    }
     return { status: 200, body: { success: true, user: result.user }, token: result.token };
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return { status: 400, body: { error: error.errors[0]?.message || 'Validation error' } };
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
     }
     return { status: 401, body: { error: error.message || 'Invalid email or password' } };
+  }
+}
+
+export async function handleRequestLoginCode(body: any) {
+  try {
+    const validated = requestLoginCodeSchema.parse(body);
+    const result = await requestLoginCode(validated);
+    return { status: 200, body: result };
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
+    }
+    return { status: 400, body: { error: 'Request could not be processed.' } };
+  }
+}
+
+export async function handleVerifyLoginCode(body: any) {
+  try {
+    const validated = verifyLoginCodeSchema.parse(body);
+    const result = await verifyLoginCode(validated);
+    return {
+      status: 200,
+      body: { success: true, user: result.user },
+      token: result.token,
+    };
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
+    }
+    return { status: 400, body: { error: 'Invalid or expired verification code.' } };
   }
 }
 
@@ -104,7 +144,7 @@ export async function handleUpdateProfile(body: any, req: Request) {
     return { status: 200, body: { success: true, user: updated } };
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return { status: 400, body: { error: error.errors[0]?.message || 'Validation error' } };
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
     }
     return { status: 400, body: { error: error.message || 'Profile update failed' } };
   }
@@ -121,7 +161,7 @@ export async function handleChangePassword(body: any, req: Request) {
     return { status: 200, body: result };
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return { status: 400, body: { error: error.errors[0]?.message || 'Validation error' } };
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
     }
     return { status: 400, body: { error: error.message || 'Password change failed' } };
   }
@@ -137,9 +177,25 @@ export async function handleForgotPassword(body: any) {
     return { status: 200, body: result };
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return { status: 400, body: { error: error.errors[0]?.message || 'Validation error' } };
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
     }
     return { status: 400, body: { error: error.message || 'Request failed' } };
+  }
+}
+
+/**
+ * POST /api/auth/verify-reset-code
+ */
+export async function handleVerifyResetCode(body: any) {
+  try {
+    const validated = verifyResetCodeSchema.parse(body);
+    const result = await verifyResetCode(validated);
+    return { status: 200, body: result };
+  } catch (error: any) {
+    if (error.name === 'ZodError') {
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
+    }
+    return { status: 400, body: { error: error.message || 'Verification failed' } };
   }
 }
 
@@ -153,7 +209,7 @@ export async function handleResetPassword(body: any) {
     return { status: 200, body: result };
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return { status: 400, body: { error: error.errors[0]?.message || 'Validation error' } };
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
     }
     return { status: 400, body: { error: error.message || 'Password reset failed' } };
   }
@@ -171,7 +227,7 @@ export async function handleAdminCreateStaff(body: any, req: Request) {
     return { status: 201, body: { success: true, user: staff } };
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return { status: 400, body: { error: error.errors[0]?.message || 'Validation error' } };
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
     }
     const status = error.message.includes('Forbidden') ? 403 : 400;
     return { status, body: { error: error.message || 'Staff provisioning failed' } };
@@ -200,7 +256,7 @@ export async function handleCreateAddress(body: any, req: Request) {
     return { status: 201, body: { success: true, address } };
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return { status: 400, body: { error: error.errors[0]?.message || 'Validation error' } };
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
     }
     return { status: 400, body: { error: error.message || 'Failed to save address' } };
   }
@@ -214,7 +270,7 @@ export async function handleUpdateAddress(addressId: string, body: any, req: Req
     return { status: 200, body: { success: true, address } };
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return { status: 400, body: { error: error.errors[0]?.message || 'Validation error' } };
+      return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
     }
     return { status: 400, body: { error: error.message || 'Failed to update address' } };
   }

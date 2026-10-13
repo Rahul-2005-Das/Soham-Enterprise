@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Wrench, Mail, Lock, AlertCircle, ArrowRight, ShieldCheck, CheckCircle2, User, KeyRound } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Wrench, Mail, Lock, KeyRound, AlertCircle, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { PageRoute } from '../types';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -11,11 +11,27 @@ interface LoginPageProps {
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
-  const { user, login, logout } = useAuth();
+  const { user, login, requestLoginCode, verifyLoginCode, logout } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [mode, setMode] = useState<'code' | 'password'>('code');
+  const [codeRequested, setCodeRequested] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRequestingCode, setIsRequestingCode] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (resendCooldown === 0) return;
+
+    const timeout = window.setTimeout(() => {
+      setResendCooldown((remaining) => Math.max(remaining - 1, 0));
+    }, 1000);
+
+    return () => window.clearTimeout(timeout);
+  }, [resendCooldown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,10 +53,60 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
     }
   };
 
-  const handleQuickFill = (roleEmail: string, rolePass: string) => {
-    setEmail(roleEmail);
-    setPassword(rolePass);
+  const requestCode = async () => {
     setErrorMessage(null);
+    setInfoMessage(null);
+    setIsRequestingCode(true);
+    try {
+      const result = await requestLoginCode(email);
+      if (!result.success) {
+        setErrorMessage(result.error || 'Could not request a sign-in code.');
+        return;
+      }
+      setCodeRequested(true);
+      setCode('');
+      setResendCooldown(60);
+      setInfoMessage(result.message || 'If this email can receive messages, a sign-in code has been sent.');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Could not request a sign-in code.');
+    } finally {
+      setIsRequestingCode(false);
+    }
+  };
+
+  const verifyCode = async () => {
+    setErrorMessage(null);
+    if (!/^\d{6}$/.test(code)) {
+      setErrorMessage('Enter the 6-digit code from your email.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await verifyLoginCode(email, code);
+      if (!result.success) {
+        setErrorMessage(result.error || 'Invalid or expired verification code.');
+      } else {
+        onNavigate('profile');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Could not verify the sign-in code.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFormSubmit = (e: React.FormEvent) => {
+    if (mode === 'code') {
+      e.preventDefault();
+      if (codeRequested) {
+        void verifyCode();
+      } else {
+        void requestCode();
+      }
+      return;
+    }
+    void handleSubmit(e);
   };
 
   if (user) {
@@ -101,7 +167,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
               <Wrench className="w-5 h-5" />
             </div>
             <span className="text-2xl font-black text-slate-900 tracking-tight">
-              Sohom <span className="text-blue-600 font-extrabold">Enterprises</span>
+              Soham <span className="text-blue-600 font-extrabold">Enterprises</span>
             </span>
           </div>
           <h2 className="text-xl font-bold text-slate-900">Secure Sign In</h2>
@@ -110,44 +176,35 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
           </p>
         </div>
 
-        {/* Quick Testing Role Presets */}
-        <div className="bg-blue-50/70 border border-blue-200/80 rounded-xl p-3 text-xs text-blue-900">
-          <div className="flex items-center justify-between font-semibold mb-2">
-            <span className="flex items-center gap-1.5">
-              <KeyRound className="w-3.5 h-3.5 text-blue-600" /> Quick Credential Select:
-            </span>
-            <span className="text-[10px] text-blue-600 uppercase tracking-wide">Test Accounts</span>
-          </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            <button
-              type="button"
-              onClick={() => handleQuickFill('customer_test1@example.com', 'FinalPassword789!')}
-              className="px-2 py-1.5 bg-white border border-blue-200 rounded-lg hover:bg-blue-100/60 transition text-left text-[11px] font-medium"
-            >
-              <div className="font-bold text-slate-800">Customer</div>
-              <div className="text-[10px] text-slate-500 truncate">customer_test1</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickFill('admin@sohomenterprises.com', 'Admin@2026Sohom')}
-              className="px-2 py-1.5 bg-white border border-blue-200 rounded-lg hover:bg-blue-100/60 transition text-left text-[11px] font-medium"
-            >
-              <div className="font-bold text-slate-800">Admin</div>
-              <div className="text-[10px] text-slate-500 truncate">admin@sohom</div>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleQuickFill('technician@sohomenterprises.com', 'Tech@2026Sohom')}
-              className="px-2 py-1.5 bg-white border border-blue-200 rounded-lg hover:bg-blue-100/60 transition text-left text-[11px] font-medium"
-            >
-              <div className="font-bold text-slate-800">Technician</div>
-              <div className="text-[10px] text-slate-500 truncate">technician@</div>
-            </button>
-          </div>
-        </div>
-
         <Card className="p-6 sm:p-8 border-slate-200 shadow-sm">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-slate-100 p-1 mb-5" role="tablist" aria-label="Sign-in method">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'code'}
+              onClick={() => { setMode('code'); setErrorMessage(null); }}
+              className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${mode === 'code' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              Email code
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'password'}
+              onClick={() => { setMode('password'); setErrorMessage(null); }}
+              className={`rounded-md px-3 py-2 text-sm font-semibold transition-colors ${mode === 'password' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            >
+              Password
+            </button>
+          </div>
+
+          {mode === 'code' && (
+            <p className="mb-4 text-center text-xs text-slate-500">
+              Sign in or create a customer account with a one-time email code.
+            </p>
+          )}
+
+          <form onSubmit={handleFormSubmit} className="space-y-4">
             {errorMessage && (
               <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -161,54 +218,115 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onNavigate }) => {
               required
               placeholder="e.g. yourname@example.com"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setCodeRequested(false);
+                setInfoMessage(null);
+                setCode('');
+                setResendCooldown(0);
+              }}
               icon={<Mail className="w-4 h-4" />}
             />
 
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-700">Password</label>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('forgot-password')}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+            {mode === 'password' ? (
+              <>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-700">Password</label>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('forgot-password')}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <Input
+                    type="password"
+                    required
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    icon={<Lock className="w-4 h-4" />}
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="md"
+                  disabled={isSubmitting}
+                  className="w-full justify-center mt-2 shadow-blue-600/20"
+                  id="login-submit-btn"
                 >
-                  Forgot password?
-                </button>
-              </div>
-              <Input
-                type="password"
-                required
-                placeholder="••••••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                icon={<Lock className="w-4 h-4" />}
-              />
-            </div>
-
-            <Button
-              type="submit"
-              variant="primary"
-              size="md"
-              disabled={isSubmitting}
-              className="w-full justify-center mt-2 shadow-blue-600/20"
-              id="login-submit-btn"
-            >
-              {isSubmitting ? 'Authenticating...' : 'Sign In'}
-              {!isSubmitting && <ArrowRight className="w-4 h-4 ml-1.5" />}
-            </Button>
+                  {isSubmitting ? 'Authenticating...' : 'Sign In'}
+                  {!isSubmitting && <ArrowRight className="w-4 h-4 ml-1.5" />}
+                </Button>
+              </>
+            ) : (
+              <>
+                {codeRequested && (
+                  <>
+                    {infoMessage && <p className="text-xs text-emerald-700" role="status">{infoMessage}</p>}
+                    <Input
+                      label="6-Digit Email Code"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      required
+                      placeholder="123456"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      icon={<KeyRound className="w-4 h-4" />}
+                    />
+                    <div className="flex items-center justify-between text-xs text-slate-500">
+                      <span>Code expires in 10 minutes.</span>
+                      <button
+                        type="button"
+                        onClick={requestCode}
+                        disabled={isRequestingCode || resendCooldown > 0}
+                        className="font-semibold text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                      >
+                        {isRequestingCode ? 'Sending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                      </button>
+                    </div>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      size="md"
+                      disabled={isSubmitting || code.length !== 6}
+                      className="w-full justify-center mt-2"
+                    >
+                      {isSubmitting ? 'Verifying...' : 'Verify & Sign In'}
+                      {!isSubmitting && <ArrowRight className="w-4 h-4 ml-1.5" />}
+                    </Button>
+                  </>
+                )}
+                {!codeRequested && (
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    disabled={isRequestingCode}
+                    className="w-full justify-center mt-2 shadow-blue-600/20"
+                  >
+                    {isRequestingCode ? 'Sending Code...' : 'Send Sign-in Code'}
+                    {!isRequestingCode && <ArrowRight className="w-4 h-4 ml-1.5" />}
+                  </Button>
+                )}
+              </>
+            )}
           </form>
 
           <div className="mt-6 pt-6 border-t border-slate-100 text-center">
             <p className="text-xs text-slate-600">
-              Don't have an account yet?{' '}
+              New to Soham?{' '}
               <button
                 type="button"
                 onClick={() => onNavigate('register')}
                 className="text-blue-600 hover:text-blue-700 font-bold ml-1 hover:underline"
                 id="login-to-register-btn"
               >
-                Register as Customer
+                Create an account
               </button>
             </p>
           </div>

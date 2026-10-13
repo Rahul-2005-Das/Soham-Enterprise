@@ -2,6 +2,8 @@ import React from 'react';
 import { X, Trash2, Plus, Minus, ArrowRight, ShieldCheck, ShoppingBag } from 'lucide-react';
 import { CartItem } from '../../types';
 import { Button } from '../ui/Button';
+import { ProductImage } from '../ProductImage';
+import { useSite } from '../../context/SiteContext';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -20,13 +22,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   onRemoveItem,
   onCheckout
 }) => {
+  const { settings } = useSite();
   if (!isOpen) return null;
 
   const subtotal = items.reduce(
     (acc, item) => acc + item.product.price * item.quantity,
     0
   );
-  const deliveryCharges = subtotal > 999 || subtotal === 0 ? 0 : 79;
+  const shippingFee = Number(settings.shippingFee);
+  const freeShippingThreshold = Number(settings.freeShippingThreshold);
+  const deliveryCharges = subtotal > freeShippingThreshold || subtotal === 0 ? 0 : shippingFee;
   const grandTotal = subtotal + deliveryCharges;
 
   return (
@@ -67,7 +72,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 key={product.id}
                 className="flex items-center gap-3 p-3.5 rounded-xl border border-slate-200 bg-white"
               >
-                <img
+                <ProductImage
                   src={product.imageUrl}
                   alt={product.name}
                   className="w-16 h-16 rounded-lg object-cover bg-slate-50 border border-slate-100 shrink-0"
@@ -130,7 +135,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                 <span>Doorstep Shipping</span>
                 <span className="font-semibold text-slate-900">
                   {deliveryCharges === 0 ? (
-                    <span className="text-emerald-600 font-bold">FREE (Orders &gt; ₹999)</span>
+                    <span className="text-emerald-600 font-bold">FREE (Orders &gt; ₹{freeShippingThreshold})</span>
                   ) : (
                     `₹${deliveryCharges}`
                   )}

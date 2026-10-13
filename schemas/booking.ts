@@ -27,12 +27,11 @@ export const updateBookingStatusSchema = z.object({
   status: z.enum([
     'PENDING',
     'CONFIRMED',
-    'TECHNICIAN_ASSIGNED',
     'ON_THE_WAY',
     'IN_PROGRESS',
     'COMPLETED',
     'CANCELLED',
   ]),
-  technicianNotes: z.string().optional(),
+  customerNotes: z.string().optional(),
   finalAmount: z.number().nonnegative().optional(),
 });

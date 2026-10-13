@@ -76,7 +76,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
               <Wrench className="w-5 h-5" />
             </div>
             <span className="text-2xl font-black text-slate-900 tracking-tight">
-              Sohom <span className="text-blue-600 font-extrabold">Enterprises</span>
+              Soham <span className="text-blue-600 font-extrabold">Enterprises</span>
             </span>
           </div>
           <h2 className="text-xl font-bold text-slate-900">Create Customer Account</h2>
@@ -93,7 +93,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
               </div>
               <h3 className="text-lg font-bold text-slate-900">Account Created Successfully!</h3>
               <p className="text-xs text-slate-600">
-                Welcome to Sohom Enterprises. Your customer account is ready and your session is active.
+                Welcome to Soham Enterprises. Your customer account is ready and your session is active.
               </p>
               <div className="pt-2 flex flex-col gap-2">
                 <Button
@@ -183,7 +183,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                   className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
                 <label htmlFor="agree-terms" className="text-xs text-slate-600 leading-snug">
-                  I agree to the <span className="text-blue-600 underline">Terms of Service</span> and acknowledge Sohom Enterprises doorstep repair guidelines.
+                  I agree to the <span className="text-blue-600 underline">Terms of Service</span> and acknowledge Soham Enterprises doorstep repair guidelines.
                 </label>
               </div>
 
@@ -212,6 +212,16 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onNavigate }) => {
                   id="register-to-login-btn"
                 >
                   Sign In
+                </button>
+              </p>
+              <p className="mt-3 text-xs text-slate-600">
+                Want to sign up with just email?{' '}
+                <button
+                  type="button"
+                  onClick={() => onNavigate('login')}
+                  className="font-bold text-blue-600 hover:text-blue-700 hover:underline"
+                >
+                  Continue with email code
                 </button>
               </p>
             </div>

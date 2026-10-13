@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Wrench, Lock, KeyRound, CheckCircle2, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
 import { PageRoute } from '../types';
 import { Button } from '../components/ui/Button';
@@ -7,20 +7,100 @@ import { Input } from '../components/ui/Input';
 
 interface ResetPasswordPageProps {
   onNavigate: (page: PageRoute) => void;
-  initialToken?: string;
+  initialEmail?: string;
 }
 
-export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onNavigate, initialToken = '' }) => {
-  const [token, setToken] = useState(initialToken);
+export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onNavigate, initialEmail = '' }) => {
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [isResendingCode, setIsResendingCode] = useState(false);
+  const [codeVerified, setCodeVerified] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(60);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (resendCooldown === 0) return;
+
+    const timeout = window.setTimeout(() => {
+      setResendCooldown((remaining) => Math.max(remaining - 1, 0));
+    }, 1000);
+
+    return () => window.clearTimeout(timeout);
+  }, [resendCooldown]);
+
+  const resendCode = async () => {
+    setErrorMessage(null);
+    if (!email.trim() || resendCooldown > 0) return;
+
+    setIsResendingCode(true);
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || 'Request could not be processed.');
+        return;
+      }
+
+      setCode('');
+      setCodeVerified(false);
+      setPassword('');
+      setConfirmPassword('');
+      setResendCooldown(60);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Network error.');
+    } finally {
+      setIsResendingCode(false);
+    }
+  };
+
+  const verifyCode = async () => {
+    setErrorMessage(null);
+    if (!email.trim()) {
+      setErrorMessage('A valid email address is required.');
+      return;
+    }
+    if (!/^\d{6}$/.test(code.trim())) {
+      setErrorMessage('Verification code must be a 6-digit number.');
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    try {
+      const res = await fetch('/api/auth/verify-reset-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), code: code.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setErrorMessage(data.error || 'Verification failed.');
+        return;
+      }
+      setCodeVerified(true);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Network error.');
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    if (!codeVerified) {
+      setErrorMessage('Please verify the 6-digit code before setting a new password.');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setErrorMessage('Passwords do not match.');
@@ -32,8 +112,8 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onNavigate
       return;
     }
 
-    if (!token.trim()) {
-      setErrorMessage('Reset token is required.');
+    if (!email.trim()) {
+      setErrorMessage('A valid email address is required.');
       return;
     }
 
@@ -43,7 +123,8 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onNavigate
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          token: token.trim(),
+          email: email.trim().toLowerCase(),
+          code: code.trim(),
           password,
           confirmPassword,
         }),
@@ -75,12 +156,12 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onNavigate
               <Wrench className="w-5 h-5" />
             </div>
             <span className="text-2xl font-black text-slate-900 tracking-tight">
-              Sohom <span className="text-blue-600 font-extrabold">Enterprises</span>
+              Soham <span className="text-blue-600 font-extrabold">Enterprises</span>
             </span>
           </div>
-          <h2 className="text-xl font-bold text-slate-900">Set New Password</h2>
+          <h2 className="text-xl font-bold text-slate-900">{codeVerified ? 'Set New Password' : 'Verify Your Code'}</h2>
           <p className="text-xs text-slate-500">
-            Submit your one-time verification token and choose a strong replacement password.
+            {codeVerified ? 'Choose a new password for your account.' : 'Enter the 6-digit code from your email to continue.'}
           </p>
         </div>
 
@@ -114,45 +195,100 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onNavigate
               )}
 
               <Input
-                label="Password Reset Token"
-                type="text"
+                label="Registered Email Address"
+                type="email"
                 required
-                placeholder="Paste token from email or previous step"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
+                placeholder="name@example.com"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setCode('');
+                  setCodeVerified(false);
+                  setPassword('');
+                  setConfirmPassword('');
+                  setResendCooldown(0);
+                }}
                 icon={<KeyRound className="w-4 h-4" />}
               />
 
               <Input
-                label="New Password (min 8 characters)"
-                type="password"
+                label="6-Digit Verification Code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
                 required
-                placeholder="••••••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                icon={<Lock className="w-4 h-4" />}
+                placeholder="123456"
+                value={code}
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                  setCodeVerified(false);
+                  setPassword('');
+                  setConfirmPassword('');
+                }}
+                icon={<KeyRound className="w-4 h-4" />}
               />
 
-              <Input
-                label="Confirm New Password"
-                type="password"
-                required
-                placeholder="••••••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                icon={<Lock className="w-4 h-4" />}
-              />
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>If your account matches, a code was sent to your email.</span>
+                <button
+                  type="button"
+                  onClick={resendCode}
+                  disabled={isResendingCode || resendCooldown > 0}
+                  className="font-semibold text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-400"
+                >
+                  {isResendingCode ? 'Sending...' : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend code'}
+                </button>
+              </div>
 
               <Button
-                type="submit"
-                variant="primary"
+                type="button"
+                variant={codeVerified ? 'primary' : 'outline'}
                 size="md"
-                disabled={isSubmitting}
-                className="w-full justify-center mt-2 shadow-blue-600/20"
+                onClick={verifyCode}
+                disabled={isVerifyingCode || (!codeVerified && code.length !== 6)}
+                className="w-full justify-center"
               >
-                {isSubmitting ? 'Updating Password...' : 'Save New Password'}
-                {!isSubmitting && <ArrowRight className="w-4 h-4 ml-1.5" />}
+                {isVerifyingCode ? 'Verifying...' : codeVerified ? 'Code Verified Successfully' : 'Verify Code'}
               </Button>
+
+              {codeVerified && (
+                <>
+                  <p className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700" role="status">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Code Verified Successfully
+                  </p>
+                  <Input
+                    label="New Password (min 8 characters)"
+                    type="password"
+                    required
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    icon={<Lock className="w-4 h-4" />}
+                  />
+
+                  <Input
+                    label="Confirm New Password"
+                    type="password"
+                    required
+                    placeholder="••••••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    icon={<Lock className="w-4 h-4" />}
+                  />
+
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    size="md"
+                    disabled={isSubmitting}
+                    className="w-full justify-center mt-2 shadow-blue-600/20"
+                  >
+                    {isSubmitting ? 'Updating Password...' : 'Save New Password'}
+                    {!isSubmitting && <ArrowRight className="w-4 h-4 ml-1.5" />}
+                  </Button>
+                </>
+              )}
 
               <div className="pt-2 text-center">
                 <button
@@ -170,7 +306,7 @@ export const ResetPasswordPage: React.FC<ResetPasswordPageProps> = ({ onNavigate
         <div className="text-center">
           <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            Tokens can only be used once and become invalid immediately after submission.
+            Verification codes are single-use, expire in 10 minutes, and are invalid after a successful reset.
           </p>
         </div>
       </div>

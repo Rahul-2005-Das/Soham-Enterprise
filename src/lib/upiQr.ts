@@ -1,9 +1,9 @@
 import QRCode from 'qrcode';
 
 export interface UpiPaymentDetails {
-  vpa: string; // payee UPI VPA, e.g. "sohomenterprises@okhdfcbank"
+  vpa: string; // payee UPI VPA, e.g. "sohamenterprises@okhdfcbank"
   payeeName: string;
-  amount: number;
+  amount?: number; // Omit to let the customer enter the final amount in their UPI app.
   transactionNote: string; // typically the order number
 }
 
@@ -16,10 +16,10 @@ export function buildUpiUri({ vpa, payeeName, amount, transactionNote }: UpiPaym
   const params = new URLSearchParams({
     pa: vpa,
     pn: payeeName,
-    am: amount.toFixed(2),
     cu: 'INR',
     tn: transactionNote,
   });
+  if (amount !== undefined) params.set('am', amount.toFixed(2));
   return `upi://pay?${params.toString()}`;
 }
 

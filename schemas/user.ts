@@ -27,11 +27,20 @@ export const forgotPasswordSchema = z.object({
   email: z.string().trim().email('Please enter a valid email address').toLowerCase(),
 });
 
+export const verifyResetCodeSchema = z.object({
+  email: z.string().trim().email('Please enter a valid email address').toLowerCase(),
+  code: z.string().trim().regex(/^\d{6}$/, 'Verification code must be a 6-digit number'),
+});
+
+export const requestLoginCodeSchema = forgotPasswordSchema;
+export const verifyLoginCodeSchema = verifyResetCodeSchema;
+
 export const resetPasswordSchema = z
   .object({
-    token: z.string().min(1, 'Reset token is required'),
-    password: z.string().min(6, 'Password must be at least 6 characters').max(100),
-    confirmPassword: z.string().min(6, 'Confirm password must be at least 6 characters'),
+    email: z.string().trim().email('Please enter a valid email address').toLowerCase(),
+    code: z.string().trim().regex(/^\d{6}$/, 'Verification code must be a 6-digit number'),
+    password: z.string().min(8, 'Password must be at least 8 characters').max(100),
+    confirmPassword: z.string().min(8, 'Confirm password must be at least 8 characters'),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
@@ -83,12 +92,15 @@ export const createStaffSchema = z.object({
     .optional()
     .or(z.literal('')),
   password: z.string().min(6, 'Password must be at least 6 characters').max(100),
-  role: z.enum(['TECHNICIAN', 'ADMIN']),
+  role: z.enum(['ADMIN']),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+export type VerifyResetCodeInput = z.infer<typeof verifyResetCodeSchema>;
+export type RequestLoginCodeInput = z.infer<typeof requestLoginCodeSchema>;
+export type VerifyLoginCodeInput = z.infer<typeof verifyLoginCodeSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 export type UserProfileUpdateInput = z.infer<typeof userProfileUpdateSchema>;

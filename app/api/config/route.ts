@@ -1,5 +1,6 @@
-import { FREE_SHIPPING_THRESHOLD, FLAT_SHIPPING_FEE } from '../../../lib/pricing.ts';
 import { BUSINESS_CONFIG, isUpiConfigured } from '../../../lib/business.ts';
+import { getShippingSettings } from '../../../actions/site-settings.ts';
+import { getSiteSettings } from '../../../actions/site-settings.ts';
 
 /**
  * Public, non-sensitive checkout configuration. No auth required — this is
@@ -7,15 +8,16 @@ import { BUSINESS_CONFIG, isUpiConfigured } from '../../../lib/business.ts';
  * the frontend fetches it instead of hardcoding a second copy of it.
  */
 export async function handleGetCheckoutConfig() {
+  const [shipping, settings] = await Promise.all([getShippingSettings(), getSiteSettings()]);
   return {
     status: 200,
     body: {
-      freeShippingThreshold: FREE_SHIPPING_THRESHOLD,
-      flatShippingFee: FLAT_SHIPPING_FEE,
-      upiVpa: BUSINESS_CONFIG.upiVpa,
-      upiPayeeName: BUSINESS_CONFIG.upiPayeeName,
-      upiConfigured: isUpiConfigured(),
-      businessName: BUSINESS_CONFIG.name,
+      ...shipping,
+      upiVpa: settings.upiVpa ?? BUSINESS_CONFIG.upiVpa,
+      upiPayeeName: settings.upiPayeeName ?? BUSINESS_CONFIG.upiPayeeName,
+      upiQrImageUrl: settings.upiQrImageUrl ?? '/images/business-upi-qr.png',
+      upiConfigured: isUpiConfigured(settings.upiVpa ?? BUSINESS_CONFIG.upiVpa),
+      businessName: settings.storeName || BUSINESS_CONFIG.name,
       businessPhone: BUSINESS_CONFIG.phone,
     },
   };

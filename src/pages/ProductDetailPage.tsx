@@ -20,11 +20,23 @@ import { ApiProduct, mapApiProductToSparePart } from '../lib/productMapper';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { ProductImage } from '../components/ProductImage';
+import { ReviewSubmissionForm } from '../components/reviews/ReviewSubmissionForm';
+
+interface PublicProductReview {
+  id: string;
+  rating: number;
+  comment: string;
+  userName: string;
+  user: { name: string } | null;
+  imageUrl: string | null;
+  createdAt: string;
+}
 
 interface ProductDetailPageProps {
   productId?: string;
   onNavigate: (page: PageRoute, params?: { serviceId?: string; productId?: string }) => void;
-  onAddToCartWithQty: (productId: string, qty: number) => void;
+  onAddToCartWithQty: (productId: string, qty: number) => Promise<boolean>;
   onBuyNowWithQty: (productId: string, qty: number) => void;
 }
 
@@ -38,6 +50,25 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [product, setProduct] = useState<SparePartProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<PublicProductReview[]>([]);
+  const [reviewAggregate, setReviewAggregate] = useState({ averageRating: 0, count: 0 });
+
+  useEffect(() => {
+    if (!productId) return;
+    let cancelled = false;
+    api.get<{ success: boolean; reviews: PublicProductReview[]; aggregate: { averageRating: number; count: number } }>(
+      `/api/reviews?productId=${encodeURIComponent(productId)}`,
+      { cache: 'no-store' },
+    ).then((response) => {
+      if (!cancelled) {
+        setReviews(response.reviews);
+        setReviewAggregate(response.aggregate);
+      }
+    }).catch((error: unknown) => {
+      if (!cancelled) console.warn('[ProductDetailPage] Could not load product reviews:', error);
+    });
+    return () => { cancelled = true; };
+  }, [productId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,7 +80,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     setLoading(true);
     setLoadError(null);
     api
-      .get<ApiProduct>(`/api/products?id=${encodeURIComponent(productId)}`)
+      .get<ApiProduct>(`/api/products/${encodeURIComponent(productId)}`)
       .then((data) => {
         if (!cancelled) setProduct(mapApiProductToSparePart(data));
       })
@@ -82,11 +113,12 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     ? catalogProducts.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 3)
     : [];
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
-    onAddToCartWithQty(product.id, quantity);
-    setAddedToast(true);
-    setTimeout(() => setAddedToast(false), 2500);
+    if (await onAddToCartWithQty(product.id, quantity)) {
+      setAddedToast(true);
+      setTimeout(() => setAddedToast(false), 2500);
+    }
   };
 
   const handleBuyNow = () => {
@@ -138,7 +170,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           {/* Left Column: Product Image Gallery Box */}
           <div className="lg:col-span-6 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-4">
             <div className="relative h-80 sm:h-96 w-full flex items-center justify-center p-4 bg-slate-50 rounded-2xl border border-slate-100">
-              <img
+              <ProductImage
                 src={product.imageUrl}
                 alt={product.name}
                 className="max-h-full max-w-full object-contain drop-shadow-md"
@@ -366,6 +398,39 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           </div>
         </div>
 
+        <section className="mt-12 grid gap-6 lg:grid-cols-[1fr_0.9fr]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-black text-slate-900">Customer Reviews</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  {reviewAggregate.count
+                    ? `${reviewAggregate.averageRating.toFixed(1)} out of 5 · ${reviewAggregate.count} approved ${reviewAggregate.count === 1 ? 'review' : 'reviews'}`
+                    : 'No approved reviews yet. Be the first to share your experience.'}
+                </p>
+              </div>
+              {reviewAggregate.count > 0 && <div className="flex items-center gap-1 text-amber-500" aria-label={`${reviewAggregate.averageRating.toFixed(1)} out of 5 stars`}>
+                {[1, 2, 3, 4, 5].map((value) => <Star key={value} className={`h-5 w-5 ${value <= Math.round(reviewAggregate.averageRating) ? 'fill-current' : 'text-slate-300'}`} />)}
+              </div>}
+            </div>
+            {reviews.length > 0 && <div className="mt-5 grid gap-3">
+              {reviews.map((review) => <article key={review.id} className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-bold text-slate-900">{review.user?.name || review.userName || 'Customer'}</p>
+                  <div className="flex items-center gap-0.5 text-amber-500" aria-label={`${review.rating} out of 5 stars`}>
+                    {[1, 2, 3, 4, 5].map((value) => <Star key={value} className={`h-4 w-4 ${value <= review.rating ? 'fill-current' : 'text-slate-300'}`} />)}
+                  </div>
+                </div>
+                <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-700">{review.comment}</p>
+                {review.imageUrl && <a href={review.imageUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block">
+                  <img src={review.imageUrl} alt={`Photo shared by ${review.user?.name || review.userName}`} loading="lazy" className="h-20 w-20 rounded-lg object-cover" />
+                </a>}
+              </article>)}
+            </div>}
+          </div>
+          <ReviewSubmissionForm productId={product.id} productName={product.name} compact />
+        </section>
+
         {/* Related Spare Parts Section */}
         <div className="mt-16 pt-12 border-t border-slate-200">
           <div className="flex items-center justify-between mb-6">
@@ -390,7 +455,7 @@ export const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     className="h-36 w-full rounded-xl bg-white p-2 mb-3 cursor-pointer"
                     onClick={() => onNavigate('product-detail', { productId: rel.id })}
                   >
-                    <img src={rel.imageUrl} alt={rel.name} className="h-full w-full object-contain" />
+                    <ProductImage src={rel.imageUrl} alt={rel.name} className="h-full w-full object-contain" />
                   </div>
                   <h4
                     className="text-xs font-bold text-slate-900 line-clamp-2 cursor-pointer hover:text-blue-600"

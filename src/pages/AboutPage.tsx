@@ -5,6 +5,7 @@ import { COMPANY_INFO } from '../data/mockData';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Section } from '../components/ui/Section';
+import { useSite } from '../context/SiteContext';
 
 interface AboutPageProps {
   onNavigate: (page: PageRoute) => void;
@@ -12,6 +13,7 @@ interface AboutPageProps {
 }
 
 export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate, onOpenBooking }) => {
+  const { settings } = useSite();
   return (
     <div className="flex flex-col min-h-screen bg-white">
       {/* Header Banner */}
@@ -21,7 +23,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate, onOpenBooking 
             Our Journey & Commitment
           </span>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight">
-            About Sohom Enterprises
+            About {settings.storeName}
           </h1>
           <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
             {COMPANY_INFO.tagline}. Dedicated to restoring comfort and safety to homes through expert appliance care and certified spare parts.
@@ -40,11 +42,11 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate, onOpenBooking 
               Reliable Appliance Care Built on Integrity & Expertise
             </h2>
             <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
-              Founded with the singular purpose of eliminating the frustration of unreliable appliance repairs, Sohom Enterprises has grown into a trusted partner for residential homeowners and commercial establishments.
+              {settings.aboutUs || `Founded with the singular purpose of eliminating the frustration of unreliable appliance repairs, ${settings.storeName} has grown into a trusted partner for residential homeowners and commercial establishments.`}
             </p>
-            <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
+            {!settings.aboutUs && <p className="text-sm sm:text-base text-slate-600 leading-relaxed">
               From sophisticated reverse osmosis water purifiers and inverter split air conditioners to complex micro-controller washing machines, we combine cutting-edge testing instruments with authentic OEM replacement parts to ensure lasting repairs.
-            </p>
+            </p>}
 
             <div className="grid grid-cols-2 gap-4 pt-2">
               <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
@@ -62,7 +64,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate, onOpenBooking 
             <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-slate-200">
               <img
                 src="https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=1000&q=80"
-                alt="Sohom Enterprises Certified Technician Diagnostics"
+                alt="Soham Enterprises Certified Technician Diagnostics"
                 className="w-full h-[400px] object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent flex items-end p-6">
@@ -80,7 +82,7 @@ export const AboutPage: React.FC<AboutPageProps> = ({ onNavigate, onOpenBooking 
       <Section
         background="light"
         badge="Our Core Principles"
-        title="What Sets Sohom Enterprises Apart"
+        title="What Sets Soham Enterprises Apart"
         subtitle="Our operational values guide every doorstep repair, diagnostic scan, and spare part delivery."
       >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

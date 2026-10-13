@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Wrench, Mail, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, KeyRound, ShieldCheck } from 'lucide-react';
+import { Wrench, Mail, ArrowRight, ArrowLeft, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { PageRoute } from '../types';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -7,14 +7,12 @@ import { Input } from '../components/ui/Input';
 
 interface ForgotPasswordPageProps {
   onNavigate: (page: PageRoute, params?: any) => void;
-  onSetResetToken?: (token: string) => void;
 }
 
-export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigate, onSetResetToken }) => {
+export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNavigate }) => {
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [resultToken, setResultToken] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,11 +30,10 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNaviga
       if (!res.ok) {
         setErrorMessage(data.error || 'Request could not be processed.');
       } else {
-        setSuccessMessage(data.message || 'Password reset link sent.');
-        if (data.resetToken) {
-          setResultToken(data.resetToken);
-          if (onSetResetToken) onSetResetToken(data.resetToken);
-        }
+        setSuccessMessage(data.message || 'If an account matches this email, a verification code has been sent to your inbox.');
+        setTimeout(() => {
+          onNavigate('reset-password', { resetEmail: email.trim().toLowerCase() });
+        }, 350);
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Network error.');
@@ -58,12 +55,12 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNaviga
               <Wrench className="w-5 h-5" />
             </div>
             <span className="text-2xl font-black text-slate-900 tracking-tight">
-              Sohom <span className="text-blue-600 font-extrabold">Enterprises</span>
+              Soham <span className="text-blue-600 font-extrabold">Enterprises</span>
             </span>
           </div>
           <h2 className="text-xl font-bold text-slate-900">Reset Your Password</h2>
           <p className="text-xs text-slate-500">
-            Enter your account email to receive a secure, one-time password reset token.
+            Enter your account email to receive a one-time verification code.
           </p>
         </div>
 
@@ -74,31 +71,26 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNaviga
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <div className="text-center space-y-1">
-                <h3 className="text-base font-bold text-slate-900">Reset Token Generated</h3>
+                <h3 className="text-base font-bold text-slate-900">Check Your Email</h3>
                 <p className="text-xs text-slate-600">{successMessage}</p>
               </div>
 
-              {resultToken && (
-                <div className="p-3.5 bg-slate-100 rounded-xl border border-slate-200 text-left space-y-2">
-                  <div className="text-[11px] font-semibold text-slate-700 flex items-center gap-1.5">
-                    <KeyRound className="w-3.5 h-3.5 text-blue-600" /> Secure Token (Demo/Test Mode):
-                  </div>
-                  <div className="text-[10px] font-mono bg-white p-2 rounded border border-slate-200 break-all text-slate-800 select-all">
-                    {resultToken}
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    className="w-full justify-center text-xs"
-                    onClick={() => {
-                      onNavigate('reset-password');
-                    }}
-                  >
-                    Proceed to Reset Form
-                    <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                  </Button>
-                </div>
-              )}
+              <div className="p-3.5 bg-slate-100 rounded-xl border border-slate-200 text-left space-y-2">
+                <p className="text-[11px] text-slate-600">
+                  If an account matches this email, a verification code has been sent. Continue to enter the code and choose a new password.
+                </p>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="w-full justify-center text-xs"
+                  onClick={() => {
+                    onNavigate('reset-password', { resetEmail: email.trim().toLowerCase() });
+                  }}
+                >
+                  Enter Verification Code
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                </Button>
+              </div>
 
               <div className="pt-2 text-center">
                 <button
@@ -127,7 +119,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNaviga
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 icon={<Mail className="w-4 h-4" />}
-                helperText="We will check your account and generate a 1-hour secure reset token."
+                helperText="We will send a 6-digit verification code to the email on your account."
               />
 
               <Button
@@ -137,7 +129,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNaviga
                 disabled={isSubmitting}
                 className="w-full justify-center mt-2 shadow-blue-600/20"
               >
-                {isSubmitting ? 'Generating Token...' : 'Send Password Reset'}
+                {isSubmitting ? 'Sending Code...' : 'Send Code'}
                 {!isSubmitting && <ArrowRight className="w-4 h-4 ml-1.5" />}
               </Button>
 
@@ -157,7 +149,7 @@ export const ForgotPasswordPage: React.FC<ForgotPasswordPageProps> = ({ onNaviga
         <div className="text-center">
           <p className="text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            Tokens expire in 60 minutes and become void immediately once consumed.
+            Verification codes expire in 10 minutes and become invalid after a single successful use.
           </p>
         </div>
       </div>

@@ -1,22 +1,47 @@
 import React, { useState } from 'react';
 import { Phone, Mail, MapPin, Clock, Send, CheckCircle, MessageSquare, AlertCircle } from 'lucide-react';
-import { COMPANY_INFO } from '../data/mockData';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Section } from '../components/ui/Section';
+import { normalizePhoneForTel, normalizeWhatsappNumber, useSite } from '../context/SiteContext';
+import { api, ApiError } from '../lib/api';
 
 export const ContactPage: React.FC = () => {
+  const { settings } = useSite();
+  const supportPhone = settings.phone.trim();
+  const whatsapp = normalizeWhatsappNumber(settings.whatsappNumber);
+  const emergencyPhone = settings.emergencyPhone.trim() || supportPhone;
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('Service Inquiry');
   const [message, setMessage] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      await api.post('/api/contact-inquiries', {
+        name: name.trim(),
+        phone: phone.trim(),
+        email: email.trim() || undefined,
+        subject,
+        message: message.trim(),
+      });
+      setSubmitted(true);
+    } catch (error) {
+      setSubmitError(error instanceof ApiError
+        ? error.message
+        : 'We could not send your inquiry. Please try again or contact support directly.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -28,7 +53,7 @@ export const ContactPage: React.FC = () => {
             We're Here For You
           </span>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight">
-            Contact Sohom Enterprises
+            Contact {settings.storeName}
           </h1>
           <p className="text-base sm:text-lg text-slate-300 max-w-2xl mx-auto leading-relaxed">
             Have an appliance breakdown or spare parts inquiry? Reach our customer support desk directly.
@@ -51,8 +76,10 @@ export const ContactPage: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Phone Booking & Support</h4>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">{COMPANY_INFO.phone}</p>
-                  <p className="text-xs text-slate-500">Mon - Sun: {COMPANY_INFO.workingHours}</p>
+                  {supportPhone
+                    ? <a href={`tel:${normalizePhoneForTel(supportPhone)}`} className="mt-0.5 block text-sm font-bold text-blue-700 hover:underline">{supportPhone}</a>
+                    : <p className="mt-0.5 text-sm font-semibold text-slate-700">Contact our support team to request a callback.</p>}
+                  <p className="text-xs text-slate-500">{settings.businessHours}</p>
                 </div>
               </div>
 
@@ -62,7 +89,9 @@ export const ContactPage: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">WhatsApp Instant Chat</h4>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">{COMPANY_INFO.whatsapp}</p>
+                  {whatsapp
+                    ? <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent('Hello Soham Enterprises')}`} target="_blank" rel="noreferrer" className="mt-0.5 block text-sm font-bold text-emerald-700 hover:underline">{settings.whatsappNumber}</a>
+                    : <p className="mt-0.5 text-sm font-semibold text-slate-700">Send us a message using the WhatsApp help button.</p>}
                   <p className="text-xs text-slate-500">Send appliance photos for fast diagnosis</p>
                 </div>
               </div>
@@ -73,7 +102,9 @@ export const ContactPage: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Email Helpdesk</h4>
-                  <p className="text-sm font-bold text-slate-900 mt-0.5">{COMPANY_INFO.email}</p>
+                  {settings.supportEmail.trim()
+                    ? <a href={`mailto:${settings.supportEmail.trim()}`} className="mt-0.5 block text-sm font-bold text-sky-700 hover:underline">{settings.supportEmail}</a>
+                    : <p className="mt-0.5 text-sm font-semibold text-slate-700">Contact our support team for email assistance.</p>}
                   <p className="text-xs text-slate-500">Invoices, corporate AMCs & partnerships</p>
                 </div>
               </div>
@@ -85,10 +116,7 @@ export const ContactPage: React.FC = () => {
                 <div>
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Office & Service Hub</h4>
                   <p className="text-xs text-slate-800 font-semibold mt-0.5 leading-relaxed">
-                    {COMPANY_INFO.address}
-                  </p>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    GSTIN: {COMPANY_INFO.gstin}
+                    {settings.shopAddress.trim() || 'Contact our team for service-area and office details.'}
                   </p>
                 </div>
               </div>
@@ -98,11 +126,13 @@ export const ContactPage: React.FC = () => {
             <div className="p-5 rounded-2xl bg-slate-900 text-white border border-slate-800 space-y-2">
               <div className="flex items-center gap-2 text-sky-400 text-xs font-bold uppercase tracking-wider">
                 <AlertCircle className="w-4 h-4" />
-                <span>Emergency 2-Hour Breakdown Line</span>
+                <span>Emergency Hotline</span>
               </div>
-              <p className="text-lg font-black text-white">{COMPANY_INFO.emergencyPhone}</p>
+              {emergencyPhone
+                ? <a href={`tel:${normalizePhoneForTel(emergencyPhone)}`} className="block text-lg font-black text-white hover:underline">{emergencyPhone}</a>
+                : <p className="text-sm font-semibold text-white">Contact our support team for urgent assistance.</p>}
               <p className="text-xs text-slate-400 leading-relaxed">
-                For urgent AC gas leakage, water purifier major leaks, or severe electrical short circuits.
+                {settings.emergencyBannerText || 'For urgent AC gas leakage, water purifier major leaks, or severe electrical short circuits.'}
               </p>
             </div>
           </div>
@@ -112,7 +142,7 @@ export const ContactPage: React.FC = () => {
             <Card className="p-6 sm:p-8">
               <h3 className="text-xl font-bold text-slate-900">Send Us an Inquiry</h3>
               <p className="text-xs text-slate-500 mt-1 mb-6">
-                Fill in your details below and our service supervisor will get back to you within 60 minutes.
+                Fill in your details below and our customer service team will review your message.
               </p>
 
               {submitted ? (
@@ -122,7 +152,7 @@ export const ContactPage: React.FC = () => {
                   </div>
                   <h4 className="text-xl font-bold text-slate-900">Inquiry Received!</h4>
                   <p className="text-xs text-slate-600 max-w-sm mx-auto leading-relaxed">
-                    Thank you, {name || 'valued customer'}. Your message regarding "{subject}" has been assigned to our customer service desk.
+                    Thank you, {name || 'valued customer'}. Your message regarding "{subject}" has been saved for our customer service desk.
                   </p>
                   <Button
                     variant="outline"
@@ -130,7 +160,12 @@ export const ContactPage: React.FC = () => {
                     className="mt-4"
                     onClick={() => {
                       setSubmitted(false);
+                      setName('');
+                      setPhone('');
+                      setEmail('');
+                      setSubject('Service Inquiry');
                       setMessage('');
+                      setSubmitError('');
                     }}
                   >
                     Send Another Message
@@ -196,15 +231,17 @@ export const ContactPage: React.FC = () => {
                     />
                   </div>
 
+                  {submitError && <p role="alert" className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{submitError}</p>}
                   <div className="pt-2">
                     <Button
                       type="submit"
                       variant="primary"
                       size="lg"
+                      disabled={submitting}
                       className="w-full justify-center shadow-blue-500/20"
                       icon={<Send className="w-4 h-4" />}
                     >
-                      Submit Message
+                      {submitting ? 'Sending…' : 'Submit Message'}
                     </Button>
                   </div>
                 </form>

@@ -15,9 +15,6 @@ import {
   Building,
   Wrench,
   ShieldAlert,
-  ArrowRight,
-  Check,
-  Package,
   ShoppingBag,
 } from 'lucide-react';
 import { PageRoute, UserAddress } from '../types';
@@ -26,6 +23,7 @@ import { Card } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { useAuth } from '../context/AuthContext';
 import { api, ApiError } from '../lib/api';
+import { useSite } from '../context/SiteContext';
 
 interface ProfilePageProps {
   onNavigate: (page: PageRoute) => void;
@@ -33,6 +31,7 @@ interface ProfilePageProps {
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
   const { user, logout, updateProfile, changePassword, addAddress, deleteAddress, setDefaultAddress } = useAuth();
+  const { t } = useSite();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'addresses' | 'orders' | 'bookings' | 'security'>('profile');
 
@@ -40,6 +39,30 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
   const [orders, setOrders] = useState<any[] | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+  const downloadOrderDocument = async (order: any, kind: 'invoice' | 'payment-receipt') => {
+    const previewWindow = window.open('about:blank', '_blank');
+    previewWindow?.document.write('<p style="font:16px Arial,sans-serif;padding:24px">Preparing your PDF…</p>');
+    try {
+      const { buildCustomerOrderPdf, openPdfPreview } = await import('../../lib/pdf-documents');
+      const pdf = buildCustomerOrderPdf(order, user || {}, kind);
+      const safeOrderNumber = String(order.orderNumber).replace(/[^a-zA-Z0-9-]/g, '-');
+      openPdfPreview(pdf, `sohom-${kind === 'invoice' ? 'invoice' : 'payment-receipt'}-${safeOrderNumber}.pdf`, previewWindow);
+    } catch (err) {
+      previewWindow?.close();
+      setOrdersError(err instanceof Error ? err.message : 'Could not download the order document.');
+    }
+  };
+  const refreshOrders = async () => {
+    setOrdersLoading(true);
+    setOrdersError(null);
+    try {
+      setOrders(await api.get<any[]>('/api/orders'));
+    } catch (err) {
+      setOrdersError(err instanceof ApiError ? err.message : 'Could not load your orders.');
+    } finally {
+      setOrdersLoading(false);
+    }
+  };
 
   // Bookings tab: lazily fetched the first time the tab is opened
   const [bookings, setBookings] = useState<any[] | null>(null);
@@ -48,20 +71,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     if (activeTab === 'orders' && orders === null && !ordersLoading) {
-      setOrdersLoading(true);
-      setOrdersError(null);
-      api
-        .get<any[]>('/api/orders')
-        .then(setOrders)
-        .catch((err) => setOrdersError(err instanceof ApiError ? err.message : 'Could not load your orders.'))
-        .finally(() => setOrdersLoading(false));
+      void refreshOrders();
     }
     if (activeTab === 'bookings' && bookings === null && !bookingsLoading) {
       setBookingsLoading(true);
       setBookingsError(null);
       api
-        .get<any[]>('/api/bookings')
-        .then(setBookings)
+        .get<{ bookings: any[] }>('/api/service-bookings')
+        .then((response) => setBookings(response.bookings))
         .catch((err) => setBookingsError(err instanceof ApiError ? err.message : 'Could not load your bookings.'))
         .finally(() => setBookingsLoading(false));
     }
@@ -80,7 +97,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
   const BOOKING_STATUS_STYLES: Record<string, string> = {
     PENDING: 'bg-amber-50 text-amber-700 border-amber-200',
     CONFIRMED: 'bg-blue-50 text-blue-700 border-blue-200',
-    TECHNICIAN_ASSIGNED: 'bg-blue-50 text-blue-700 border-blue-200',
     ON_THE_WAY: 'bg-sky-50 text-sky-700 border-sky-200',
     IN_PROGRESS: 'bg-sky-50 text-sky-700 border-sky-200',
     COMPLETED: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -229,12 +245,6 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
             <Shield className="w-3 h-3 text-purple-600" /> Administrator
           </span>
         );
-      case 'TECHNICIAN':
-        return (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-            <Wrench className="w-3 h-3 text-amber-600" /> Certified Technician
-          </span>
-        );
       default:
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
@@ -267,17 +277,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
           </div>
 
           <div className="flex items-center gap-2">
-            {user.role === 'ADMIN' && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigate('admin-users')}
-                className="text-xs text-purple-700 border-purple-200 bg-purple-50/50 hover:bg-purple-100"
-              >
-                <Shield className="w-3.5 h-3.5 mr-1" />
-                Staff Management
-              </Button>
-            )}
+
             <Button
               variant="outline"
               size="sm"
@@ -293,27 +293,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
           </div>
         </div>
 
-        {/* Admin Navigation Banner if Admin */}
-        {user.role === 'ADMIN' && (
-          <div className="bg-purple-900 text-white rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
-            <div className="space-y-0.5">
-              <div className="text-sm font-bold flex items-center gap-2">
-                <Shield className="w-4 h-4 text-purple-300" /> Administrator Privileges Active
-              </div>
-              <div className="text-xs text-purple-200">
-                You have authorized clearance to provision staff accounts (Technicians & Admins).
-              </div>
-            </div>
-            <button
-              onClick={() => onNavigate('admin-users')}
-              className="px-3 py-1.5 bg-white text-purple-900 text-xs font-bold rounded-lg hover:bg-purple-50 transition inline-flex items-center gap-1.5 self-start sm:self-center"
-            >
-              Open Staff Management <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
+        <section aria-label="Quick actions" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <button onClick={() => onNavigate('services')} className="flex min-h-20 items-center gap-4 rounded-2xl bg-blue-800 px-5 text-left text-lg font-extrabold text-white shadow-lg hover:bg-blue-900 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-blue-700">
+            <Wrench className="h-8 w-8 shrink-0" /><span>{t('bookService')}</span>
+          </button>
+          <button onClick={() => setActiveTab('bookings')} className="flex min-h-20 items-center gap-4 rounded-2xl bg-slate-800 px-5 text-left text-lg font-extrabold text-white shadow-lg hover:bg-slate-900 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-slate-700">
+            <Clock className="h-8 w-8 shrink-0" /><span>{t('bookings')}</span>
+          </button>
+          <button onClick={() => onNavigate('spare-parts')} className="flex min-h-20 items-center gap-4 rounded-2xl bg-emerald-800 px-5 text-left text-lg font-extrabold text-white shadow-lg hover:bg-emerald-900 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-emerald-700">
+            <ShoppingBag className="h-8 w-8 shrink-0" /><span>{t('spareParts')}</span>
+          </button>
+        </section>
 
-        {/* Main Tabs Navigation */}
         <div className="flex items-center gap-2 border-b border-slate-200 pb-2">
           <button
             onClick={() => setActiveTab('profile')}
@@ -323,7 +314,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                 : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
-            <User className="w-3.5 h-3.5" /> Profile Details
+            <User className="w-3.5 h-3.5" /> {t('profileDetails')}
           </button>
           <button
             onClick={() => setActiveTab('addresses')}
@@ -333,7 +324,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                 : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
-            <MapPin className="w-3.5 h-3.5" /> Saved Addresses ({user.addresses?.length || 0})
+            <MapPin className="w-3.5 h-3.5" /> {t('savedAddresses')} ({user.addresses?.length || 0})
           </button>
           <button
             onClick={() => setActiveTab('orders')}
@@ -343,7 +334,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                 : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
-            <ShoppingBag className="w-3.5 h-3.5" /> My Orders
+            <ShoppingBag className="w-3.5 h-3.5" /> {t('myOrders')}
           </button>
           <button
             onClick={() => setActiveTab('bookings')}
@@ -363,7 +354,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                 : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
-            <Lock className="w-3.5 h-3.5" /> Password & Security
+            <Lock className="w-3.5 h-3.5" /> {t('security')}
           </button>
         </div>
 
@@ -373,7 +364,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
             <Card className="p-6 md:col-span-2 border-slate-200 space-y-5">
               <div>
                 <h3 className="text-base font-bold text-slate-900">Personal Information</h3>
-                <p className="text-xs text-slate-500">Update your primary contact details for doorstep technician visits.</p>
+                <p className="text-xs text-slate-500">Update your primary contact details.</p>
               </div>
 
               {profileMessage && (
@@ -664,6 +655,17 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
         {/* Tab: My Orders */}
         {activeTab === 'orders' && (
           <Card className="p-6 border-slate-200">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-base font-bold text-slate-900">My Orders</h2>
+              <button
+                type="button"
+                onClick={() => void refreshOrders()}
+                disabled={ordersLoading}
+                className="rounded-md border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                {ordersLoading ? 'Refreshing…' : 'Refresh payment status'}
+              </button>
+            </div>
             {ordersLoading ? (
               <div className="space-y-3">
                 {[...Array(3)].map((_, i) => (
@@ -711,12 +713,36 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                       ))}
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                      <span className="text-slate-500">
-                        Payment: {order.payments?.[0]?.provider === 'UPI_QR' ? 'UPI' : 'Cash on Delivery'}
-                        {' · '}
-                        {order.payments?.[0]?.status || 'PENDING'}
+                      <span className={`font-semibold ${
+                        order.payments?.[0]?.status === 'COMPLETED'
+                          ? 'text-emerald-700'
+                          : order.payments?.[0]?.status === 'FAILED' || order.payments?.[0]?.status === 'REFUNDED'
+                            ? 'text-rose-700'
+                            : 'text-amber-700'
+                      }`}>
+                        {order.payments?.[0]?.status === 'COMPLETED'
+                          ? `${order.payments?.[0]?.provider === 'UPI_QR' ? 'UPI' : 'Payment'} confirmed`
+                          : order.payments?.[0]?.status === 'FAILED'
+                            ? 'Payment failed'
+                            : order.payments?.[0]?.status === 'REFUNDED'
+                              ? 'Payment refunded'
+                              : order.payments?.[0]?.provider === 'UPI_QR'
+                                ? 'UPI payment pending admin verification'
+                                : order.payments?.[0]?.provider === 'CASH_ON_DELIVERY'
+                                  ? 'Cash on delivery · Pay when delivered'
+                                  : 'Payment status unavailable'}
                       </span>
                       <span className="font-bold text-slate-900">₹{Number(order.totalAmount)}</span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button variant="secondary" size="sm" onClick={() => downloadOrderDocument(order, 'invoice')}>
+                        View / save invoice PDF
+                      </Button>
+                      {order.payments?.[0]?.status === 'COMPLETED' && (
+                        <Button variant="secondary" size="sm" onClick={() => downloadOrderDocument(order, 'payment-receipt')}>
+                          View / save payment receipt PDF
+                        </Button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -769,12 +795,9 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
                         {String(booking.status).replace(/_/g, ' ')}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 mb-1">{booking.problemDescription}</p>
-                    {booking.technician?.user?.name && (
-                      <p className="text-[11px] text-slate-500">
-                        Technician: <span className="font-semibold text-slate-700">{booking.technician.user.name}</span>
-                      </p>
-                    )}
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                      <p className="text-xs text-slate-600 truncate max-w-sm">{booking.problemDescription}</p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -852,7 +875,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({ onNavigate }) => {
               <h3 className="text-sm font-bold text-slate-900">Security Best Practices</h3>
               <ul className="text-xs text-slate-600 space-y-2.5 list-disc pl-4 leading-relaxed">
                 <li>Never share your password or OTP with anyone.</li>
-                <li>Sohom Enterprises technicians will never request your login password.</li>
+                <li>Soham Enterprises technicians will never request your login password.</li>
                 <li>Passwords are salted and hashed using bcrypt (10 rounds).</li>
                 <li>Sessions are stored in HTTP-only cookies protected from script injection.</li>
               </ul>

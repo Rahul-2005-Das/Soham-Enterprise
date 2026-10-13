@@ -1,4 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import PrismaModule from '@prisma/client';
+import type { PrismaClient as PrismaClientType } from '@prisma/client';
+
+const { PrismaClient } = PrismaModule;
 
 /**
  * Normalizes DATABASE_URL so a password containing special characters
@@ -25,7 +28,7 @@ function getNormalizedDatabaseUrl(): string | undefined {
 }
 
 const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
+  prisma: PrismaClientType | undefined;
 };
 
 const databaseUrl = getNormalizedDatabaseUrl();

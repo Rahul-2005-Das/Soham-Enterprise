@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Wrench, ShoppingBag, Search, User, Menu, X, ChevronDown, PhoneCall, Shield, LogOut, Settings, UserCheck } from 'lucide-react';
+import { Wrench, ShoppingBag, Search, User, Menu, X, ChevronDown, PhoneCall, Shield, LogOut, Settings, UserCheck, MapPin } from 'lucide-react';
 import { PageRoute } from '../../types';
-import { SERVICES_LIST, COMPANY_INFO } from '../../data/mockData';
+import { COMPANY_INFO } from '../../data/mockData';
 import { Button } from '../ui/Button';
 import { useAuth } from '../../context/AuthContext';
+import { useCatalog } from '../../context/CatalogContext';
+import { useSite } from '../../context/SiteContext';
+import { SiteControls } from './SiteControls';
 
 
 interface NavbarProps {
@@ -21,7 +24,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCart,
   onOpenBooking
 }) => {
-  const { user, logout } = useAuth();
+  const { user, loading: authLoading, logout, location, locationStatus, requestCurrentLocation } = useAuth();
+  const { services } = useCatalog();
+  const { settings, t } = useSite();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [servicesDropdownOpen, setServicesDropdownOpen] = useState(false);
@@ -63,6 +68,15 @@ export const Navbar: React.FC<NavbarProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const defaultAddress = user?.addresses?.find((address) => address.isDefault) || user?.addresses?.[0];
+  const savedAddressLabel = defaultAddress ? [defaultAddress.city, defaultAddress.pincode].filter(Boolean).join(' ') : null;
+  const locationLabel = location
+    ? location.city && location.pincode
+      ? `${location.city} ${location.pincode}`
+      : location.city || location.label
+    : savedAddressLabel;
+  const locationUnavailable = ['denied', 'unavailable', 'error'].includes(locationStatus);
+
   return (
     <>
       <header
@@ -80,16 +94,40 @@ export const Navbar: React.FC<NavbarProps> = ({
               className="flex items-center gap-3 cursor-pointer group"
               id="brand-logo"
             >
-              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20 group-hover:bg-blue-700 transition">
-                <Wrench className="w-5 h-5 transition-transform group-hover:rotate-12" />
-              </div>
+              {settings.logoUrl
+                ? <img src={settings.logoUrl} alt="Soham Enterprises" className="h-10 w-10 rounded-xl object-contain" />
+                : <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md shadow-blue-600/20 group-hover:bg-blue-700 transition"><Wrench className="w-5 h-5 transition-transform group-hover:rotate-12" /></div>}
               <div className="flex flex-col">
                 <span className="text-xl font-black tracking-tight text-slate-900 leading-none">
-                  Sohom <span className="text-blue-600 font-extrabold">Enterprises</span>
+                  {settings.storeName}
                 </span>
                 <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-500 mt-1 hidden sm:inline">
                   Appliance Service & Spare Parts
                 </span>
+                {user?.role === 'CUSTOMER' && (
+                  <button
+                    type="button"
+                    onClick={() => locationUnavailable ? handleNavClick('profile') : requestCurrentLocation()}
+                    disabled={locationStatus === 'requesting'}
+                    className="mt-1 inline-flex max-w-[180px] items-center gap-1 text-left text-[10px] font-medium text-blue-700 disabled:cursor-wait"
+                    aria-live="polite"
+                    title={locationUnavailable ? 'Choose a saved address' : 'Update current location'}
+                  >
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    <span className="truncate">
+                      {locationStatus === 'requesting'
+                        ? 'Finding your location...'
+                        : locationLabel
+                          ? `Deliver to: ${locationLabel}`
+                          : locationUnavailable
+                            ? 'Location off · Choose address'
+                            : 'Set delivery location'}
+                    </span>
+                  </button>
+                )}
+                {user?.role === 'CUSTOMER' && location && (
+                  <span className="pl-4 text-[9px] text-slate-400">© OpenStreetMap contributors</span>
+                )}
               </div>
             </div>
 
@@ -103,7 +141,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     : 'text-slate-700 hover:text-blue-600 hover:bg-slate-50'
                 }`}
               >
-                Home
+                {t('home')}
               </button>
 
               <button
@@ -114,7 +152,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     : 'text-slate-700 hover:text-blue-600 hover:bg-slate-50'
                 }`}
               >
-                About
+                {t('about')}
               </button>
 
               {/* Services Dropdown */}
@@ -131,7 +169,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       : 'text-slate-700 hover:text-blue-600 hover:bg-slate-50'
                   }`}
                 >
-                  <span>Services</span>
+                  <span>{t('services')}</span>
                   <ChevronDown className="w-4 h-4 text-slate-400" />
                 </button>
 
@@ -149,15 +187,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                     </div>
                     <div className="grid grid-cols-1 gap-0.5">
-                      {SERVICES_LIST.map((srv) => (
+                      {services.map((srv) => (
                         <button
                           key={srv.id}
                           onClick={() => handleSelectService(srv.id)}
                           className="w-full text-left px-3 py-2 rounded-xl text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition flex items-center justify-between group"
                         >
-                          <span className="font-medium">{srv.shortName}</span>
+                          <span className="font-medium">{srv.shortDescription || srv.name}</span>
                           <span className="text-xs text-slate-400 group-hover:text-blue-600">
-                            ₹{srv.startingPrice}+
+                            ₹{Number(srv.inspectionFee)}+
                           </span>
                         </button>
                       ))}
@@ -174,7 +212,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     : 'text-slate-700 hover:text-blue-600 hover:bg-slate-50'
                 }`}
               >
-                Spare Parts
+                {t('spareParts')}
               </button>
 
               <button
@@ -191,6 +229,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
             {/* Actions: Search, Cart, Login, Book Service CTA */}
             <div className="flex items-center gap-2 sm:gap-3">
+              <div className="hidden lg:block"><SiteControls compact /></div>
               {/* Search Button */}
               <button
                 onClick={() => setSearchModalOpen(true)}
@@ -217,6 +256,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </span>
                 )}
               </button>
+
+              {user?.role === 'ADMIN' ? (
+                <button
+                  type="button"
+                  onClick={() => handleNavClick('admin-dashboard')}
+                  title="Open admin dashboard"
+                  aria-label="Admin Dashboard"
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-2.5 text-xs font-bold text-blue-700 transition hover:bg-blue-100 sm:px-3"
+                >
+                  <Shield className="h-4 w-4" />
+                  <span className="hidden md:inline">Admin Dashboard</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleNavClick('admin-login')}
+                  title="Admin Login"
+                  aria-label="Admin Login"
+                  className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 sm:px-3"
+                >
+                  <Shield className="h-4 w-4 text-slate-400" />
+                  <span className="hidden md:inline">Admin Login</span>
+                </button>
+              )}
 
               {/* Login or User Menu */}
               {user ? (
@@ -262,16 +325,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
 
                       {user.role === 'ADMIN' && (
-                        <button
-                          onClick={() => {
-                            setUserMenuOpen(false);
-                            handleNavClick('admin-users');
-                          }}
-                          className="w-full px-3.5 py-2 text-xs font-medium text-purple-700 hover:bg-purple-50 text-left flex items-center gap-2 transition"
-                        >
-                          <Shield className="w-3.5 h-3.5 text-purple-600" />
-                          <span>Staff Provisioning</span>
-                        </button>
+                        <div>
+                          <button
+                            onClick={() => {
+                              setUserMenuOpen(false);
+                              handleNavClick('admin-dashboard');
+                            }}
+                            className="w-full px-3.5 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50 text-left flex items-center gap-2 transition"
+                          >
+                            <Shield className="w-3.5 h-3.5 text-blue-600" />
+                            <span>Admin Dashboard</span>
+                          </button>
+                        </div>
                       )}
 
                       <div className="border-t border-slate-100 mt-1 pt-1">
@@ -290,6 +355,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                   )}
                 </div>
+              ) : authLoading ? (
+                <span role="status" className="hidden px-3 py-2 text-xs text-slate-500 sm:inline-flex">Checking session…</span>
               ) : (
                 <button
                   onClick={() => handleNavClick('login')}
@@ -332,13 +399,14 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="lg:hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="fixed inset-y-0 right-0 w-full max-w-xs bg-white shadow-2xl p-6 flex flex-col justify-between overflow-y-auto">
             <div className="space-y-6">
+              <div className="flex justify-end"><SiteControls /></div>
               {/* Mobile Header */}
               <div className="flex items-center justify-between pb-4 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
-                    <Wrench className="w-4 h-4" />
-                  </div>
-                  <span className="font-bold text-slate-900 text-base">Sohom Enterprises</span>
+                  {settings.logoUrl
+                    ? <img src={settings.logoUrl} alt="" className="h-8 w-8 rounded-lg object-contain" />
+                    : <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white"><Wrench className="w-4 h-4" /></div>}
+                  <span className="font-bold text-slate-900 text-base">{settings.storeName}</span>
                 </div>
                 <button
                   onClick={() => setMobileMenuOpen(false)}
@@ -357,7 +425,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     currentPage === 'home' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-800'
                   }`}
                 >
-                  Home
+                  {t('home')}
                 </button>
 
                 <button
@@ -366,7 +434,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     currentPage === 'about' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-800'
                   }`}
                 >
-                  About Us
+                  {t('about')}
                 </button>
 
                 <button
@@ -375,7 +443,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     currentPage === 'services' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-800'
                   }`}
                 >
-                  All Services (8 Appliances)
+                  {t('services')}
                 </button>
 
                 <button
@@ -384,7 +452,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     currentPage === 'spare-parts' ? 'bg-blue-50 text-blue-600 font-semibold' : 'text-slate-800'
                   }`}
                 >
-                  Spare Parts Shop
+                  {t('spareParts')}
                 </button>
 
                 <button
@@ -443,13 +511,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </span>
                   </button>
 
-                  {user.role === 'ADMIN' && (
+                  {user.role === 'ADMIN' ? (
                     <button
-                      onClick={() => handleNavClick('admin-users')}
-                      className="w-full py-2.5 px-3 rounded-lg text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 text-left flex items-center gap-1.5"
+                      onClick={() => handleNavClick('admin-dashboard')}
+                      className="w-full py-2.5 px-3 rounded-lg text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 text-left flex items-center gap-1.5"
                     >
                       <Shield className="w-3.5 h-3.5" />
-                      <span>Staff Management</span>
+                      <span>Admin Dashboard</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleNavClick('admin-login')}
+                      className="w-full py-2.5 px-3 rounded-lg text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 text-left flex items-center gap-1.5"
+                    >
+                      <Shield className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Admin Login</span>
                     </button>
                   )}
 
@@ -465,6 +541,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <span>Sign Out</span>
                   </button>
                 </div>
+              ) : authLoading ? (
+                <p role="status" className="border-t border-slate-100 pt-3 text-xs text-slate-500">Checking session…</p>
               ) : (
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
                   <Button
@@ -483,6 +561,15 @@ export const Navbar: React.FC<NavbarProps> = ({
                   >
                     Register
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full col-span-2 border-slate-300 text-slate-600"
+                    onClick={() => handleNavClick('admin-login')}
+                  >
+                    <Shield className="w-4 h-4 mr-2 inline-block text-slate-400" />
+                    Admin Login
+                  </Button>
                 </div>
               )}
 
@@ -492,9 +579,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="pt-6 border-t border-slate-100 text-xs text-slate-500 space-y-2">
               <div className="flex items-center gap-2 text-slate-700 font-semibold">
                 <PhoneCall className="w-4 h-4 text-blue-600" />
-                <span>{COMPANY_INFO.phone}</span>
+                <span>{settings.phone || 'Support number coming soon'}</span>
               </div>
-              <p>Mon - Sun: 8:00 AM - 9:00 PM</p>
+              <p>{settings.businessHours}</p>
             </div>
           </div>
         </div>
@@ -530,7 +617,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="mt-4 space-y-2 max-h-60 overflow-y-auto">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Quick Suggestions</p>
               <div className="flex flex-wrap gap-2">
-                {SERVICES_LIST.slice(0, 5).map((srv) => (
+                {services.slice(0, 5).map((srv) => (
                   <button
                     key={srv.id}
                     onClick={() => {
@@ -539,7 +626,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }}
                     className="text-xs bg-slate-100 hover:bg-blue-50 hover:text-blue-600 text-slate-700 px-3 py-1.5 rounded-lg transition"
                   >
-                    {srv.shortName}
+                    {srv.shortDescription || srv.name}
                   </button>
                 ))}
                 <button

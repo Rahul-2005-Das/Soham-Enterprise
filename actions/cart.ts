@@ -17,6 +17,7 @@ export async function getCart(authenticatedSessionToken?: string) {
         include: {
           product: {
             include: {
+              category: true,
               images: { orderBy: { sortOrder: 'asc' }, take: 1 },
             },
           },
@@ -34,6 +35,7 @@ export async function getCart(authenticatedSessionToken?: string) {
           include: {
             product: {
               include: {
+                category: true,
                 images: { orderBy: { sortOrder: 'asc' }, take: 1 },
               },
             },
@@ -100,7 +102,14 @@ export async function addCartItem(
     where: { cartId_productId: { cartId: cart.id, productId: validated.productId } },
     update: { quantity: { increment: validated.quantity } },
     create: { cartId: cart.id, productId: validated.productId, quantity: validated.quantity },
-    include: { product: { include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } } } },
+    include: {
+      product: {
+        include: {
+          category: true,
+          images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+        },
+      },
+    },
   });
 
   return { success: true, item: cartItem };

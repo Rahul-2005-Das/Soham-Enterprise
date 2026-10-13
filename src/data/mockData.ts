@@ -1,12 +1,12 @@
-import { ServiceCategory, SparePartProduct, Testimonial, FaqItem } from '../types';
+import { SparePartProduct, Testimonial, FaqItem } from '../types';
 
 export const COMPANY_INFO = {
-  name: 'Sohom Enterprises',
+  name: 'Soham Enterprises',
   tagline: 'Service • Spare Parts • Your Home, Our Priority',
-  phone: '+91 98765 43210 (CLIENT DATA REQUIRED)',
-  emergencyPhone: '+91 98765 43211 (CLIENT DATA REQUIRED)',
-  whatsapp: '+91 98765 43210 (CLIENT DATA REQUIRED)',
-  email: 'support@sohomenterprises.com (CLIENT DATA REQUIRED)',
+  phone: '+91 90887 48747',
+  emergencyPhone: '+91 90887 48747',
+  whatsapp: '+91 90887 48747',
+  email: 'support@sohamenterprises.com (CLIENT DATA REQUIRED)',
   address: 'Shop No. 14, Ground Floor, Central Appliance Hub, City Center Road (CLIENT DATA REQUIRED)',
   serviceAreas: 'Serving Greater Metro & Suburbs (CLIENT DATA REQUIRED)',
   workingHours: 'Monday – Sunday: 8:00 AM – 9:00 PM',
@@ -18,306 +18,6 @@ export const COMPANY_INFO = {
     genuinePartsStock: '2,500+'
   }
 };
-
-export const SERVICES_LIST: ServiceCategory[] = [
-  {
-    id: 'srv-aquaguard',
-    slug: 'aquaguard-water-purifier',
-    name: 'Aquaguard & Water Purifier Service & Repair',
-    shortName: 'Aquaguard / Water Purifier',
-    tagline: 'Pristine drinking water with authentic sediment, carbon & RO membrane replacement',
-    iconName: 'Droplets',
-    imageUrl: 'https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=800&q=80',
-    startingPrice: 399,
-    durationMinutes: 45,
-    warrantyDays: 30,
-    popular: true,
-    commonProblems: [
-      'Low water flow / trickling output',
-      'Unusual foul taste or odor in water',
-      'Water leakage from body or connectors',
-      'Auto shut-off switch failure / overflow',
-      'Continuous beeping alarm or filter alert',
-      'TDS level higher than safe threshold'
-    ],
-    description: 'Complete inspection and preventative maintenance for all RO, UV, and UF water purifiers. Includes inlet pressure diagnostics, multi-stage filter sediment cleansing, membrane flush, electrical booster pump test, and digital TDS water quality calibration.',
-    serviceProcess: [
-      { step: 1, title: 'In-Depth Diagnostics', desc: 'Pre-service TDS measurement, water pressure check, and leak inspection.' },
-      { step: 2, title: 'Filter Chamber Sanitization', desc: 'Sediment and activated carbon cartridge cleansing or replacement.' },
-      { step: 3, title: 'Booster Pump & Valve Testing', desc: 'Solenoid valve and high-pressure cut-off switch performance check.' },
-      { step: 4, title: 'Post-Service TDS Certification', desc: 'Final water output test with TDS meter and 30-day service warranty seal.' }
-    ],
-    benefits: [
-      'Genuine certified food-grade filter cartridges',
-      'Precise electronic TDS level calibration',
-      'Complete leak-proof fitting replacement',
-      '30-Day post-service guarantee on workmanship'
-    ],
-    faqList: [
-      { question: 'How frequently should I service my RO water purifier?', answer: 'We recommend routine filter replacement every 6 to 9 months and a full system diagnostic every 12 months depending on your input water TDS.' },
-      { question: 'Do you supply genuine filter replacements for Kent, Aquaguard, and AO Smith?', answer: 'Yes, we only use OEM-certified and high-spec compatible cartridges that meet ISI drinking water standards.' }
-    ]
-  },
-  {
-    id: 'srv-ac',
-    slug: 'ac-service-repair',
-    name: 'Air Conditioner (AC) Service, Gas Refill & Repair',
-    shortName: 'AC Service & Repair',
-    tagline: 'Split & Window AC jet cleaning, gas charging, compressor and PCB diagnostics',
-    iconName: 'Wind',
-    imageUrl: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?auto=format&fit=crop&w=800&q=80',
-    startingPrice: 499,
-    durationMinutes: 60,
-    warrantyDays: 30,
-    popular: true,
-    commonProblems: [
-      'AC blowing warm air / Not cooling properly',
-      'Water dripping or leaking inside room',
-      'Unpleasant moldy or burnt smell',
-      'Abnormal compressor vibration or buzzing sound',
-      'AC automatically turning off repeatedly',
-      'Remote not responding / PCB error code on display'
-    ],
-    description: 'Keep your indoor climate icy cool with our foam-jet deep pressure cleaning. Our technicians service split, inverter, and window AC units from all major brands, diagnosing refrigerant gas levels, cooling coils, capacitor health, and outdoor fan performance.',
-    serviceProcess: [
-      { step: 1, title: 'Pre-Check & Airflow Test', desc: 'Checking cooling output temperature, current drawn, and remote responsiveness.' },
-      { step: 2, title: 'Foam Jet Pressure Cleaning', desc: 'Indoor coil, blower wheel, drain tray, and outdoor condenser power wash.' },
-      { step: 3, title: 'Refrigerant Pressure Verification', desc: 'Gauge manifold pressure test for R32, R410A, or R22 gas levels.' },
-      { step: 4, title: 'Cooling Performance Handover', desc: 'Thermometer verification of vent temperature drop and final report.' }
-    ],
-    benefits: [
-      'High-pressure foam-jet washing bag kit',
-      'Extends compressor lifespan and cuts power bills up to 25%',
-      'Original spare capacitors, fan motors & remotes',
-      'Accurate manifold pressure verification'
-    ],
-    faqList: [
-      { question: 'What is included in the basic AC deep cleaning service?', answer: 'It includes complete indoor unit deep foam jet wash, outdoor condenser coil power wash, drain pipe flushing, filter sanitization, and cooling gas pressure inspection.' },
-      { question: 'What warranty is provided on AC gas charging?', answer: 'We provide a 60-day warranty against refrigerant leakage following gas top-up or full refill.' }
-    ]
-  },
-  {
-    id: 'srv-refrigerator',
-    slug: 'refrigerator-service-repair',
-    name: 'Refrigerator Service & Compressor Repair',
-    shortName: 'Refrigerator',
-    tagline: 'Fast cooling restoration for Single Door, Double Door, and Side-by-Side fridges',
-    iconName: 'Refrigerator',
-    imageUrl: 'https://images.unsplash.com/photo-1571175443880-49e1d25b2bc5?auto=format&fit=crop&w=800&q=80',
-    startingPrice: 349,
-    durationMinutes: 60,
-    warrantyDays: 30,
-    popular: true,
-    commonProblems: [
-      'Freezer working but lower fridge compartment warm',
-      'Excessive frost build-up / Defrost cycle failure',
-      'Fridge continuously clicking without cooling',
-      'Water pooling at bottom or underneath vegetable box',
-      'Loud humming noise from rear compressor area',
-      'Door gasket loose / Cold air escaping'
-    ],
-    description: 'Expert doorstep repairs for frost-free and direct-cool refrigerators. We troubleshoot relay switches, overload protectors, inverter motherboards, defrost timers, defrost heaters, thermostat sensors, and cooling coil capillary tubes.',
-    serviceProcess: [
-      { step: 1, title: 'Thermal & Electrical Scan', desc: 'Measuring compartment temperatures and compressor amp draw.' },
-      { step: 2, title: 'Defrost & Evaporator Diagnostic', desc: 'Testing bi-metal thermostat, thermal fuse, and fan motor rotation.' },
-      { step: 3, title: 'Relay & Gas Pressure Check', desc: 'Inspecting start relay capacitor and suction pressure.' },
-      { step: 4, title: 'Door Seal & Cooling Verification', desc: 'Magnetic gasket inspection and sealing test.' }
-    ],
-    benefits: [
-      'Stock of original PTC relays, thermostats & timers',
-      'Environment-friendly hydrocarbon gas refilling (R600a/R134a)',
-      'Door seal replacement on request',
-      '30-Day service warranty'
-    ],
-    faqList: [
-      { question: 'Why is my fridge making a clicking sound every few minutes?', answer: 'A clicking sound usually indicates a faulty PTC starter relay or failing compressor overload protector. Our technician can replace this on the spot.' }
-    ]
-  },
-  {
-    id: 'srv-washing-machine',
-    slug: 'washing-machine-service-repair',
-    name: 'Washing Machine Repair & Drum Cleaning',
-    shortName: 'Washing Machine',
-    tagline: 'Front Load, Top Load & Semi-Automatic diagnostic & motor repairs',
-    iconName: 'Shirt',
-    imageUrl: 'https://images.unsplash.com/photo-1626806787461-102c1bfaaea1?auto=format&fit=crop&w=800&q=80',
-    startingPrice: 349,
-    durationMinutes: 60,
-    warrantyDays: 30,
-    popular: true,
-    commonProblems: [
-      'Machine not draining water / Error OE or 5E',
-      'Violent vibration or loud banging during spin cycle',
-      'Drum not spinning / Motor humming',
-      'Water overflowing or inlet valve not shutting off',
-      'Door lock jammed / Door latch broken',
-      'Foul odor and mildew residue in drum'
-    ],
-    description: 'Comprehensive mechanical and electronic service for automatic washing machines. We fix drive belts, drain pumps, suspension dampers, bearings, inlet solenoid valves, pressure switches, and PCB controllers.',
-    serviceProcess: [
-      { step: 1, title: 'Error Code Readout', desc: 'Diagnosing system codes, cycle test, and inlet/outlet flow.' },
-      { step: 2, title: 'Mechanical Suspension Check', desc: 'Testing shock absorbers, counterweights, and spider arm bearings.' },
-      { step: 3, title: 'Drain & Pump Cleaning', desc: 'Debris filter unclogging and impeller motor inspection.' },
-      { step: 4, title: 'Spin Cycle Quality Run', desc: 'High-RPM balance test with vibration damping check.' }
-    ],
-    benefits: [
-      'OEM replacement drain pumps and suspension rods',
-      'High-grade anti-scale descaling deep cleans available',
-      'Door boot gasket and lock switch replacement',
-      'Tested across brands: LG, Samsung, IFB, Whirlpool, Bosch'
-    ],
-    faqList: [
-      { question: 'Why is my washing machine shaking violently during spin?', answer: 'This typically stems from worn suspension shock absorbers, unbalanced leveling feet, or broken drum spider bearings.' }
-    ]
-  },
-  {
-    id: 'srv-microwave',
-    slug: 'microwave-oven-service-repair',
-    name: 'Microwave Oven Service & Magnetron Repair',
-    shortName: 'Microwave Oven',
-    tagline: 'Solo, Grill & Convection heating and high-voltage repairs',
-    iconName: 'Flame',
-    imageUrl: 'https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?auto=format&fit=crop&w=800&q=80',
-    startingPrice: 299,
-    durationMinutes: 45,
-    warrantyDays: 30,
-    popular: false,
-    commonProblems: [
-      'Microwave runs but does not heat food',
-      'Sparks and crackling inside cooking cavity',
-      'Turntable glass tray not rotating',
-      'Keypad buttons or touch panel unresponsive',
-      'Display dead / Blown high-voltage fuse',
-      'Door microswitch failure / wont start with door closed'
-    ],
-    description: 'Safe and certified service for high-voltage microwave circuits. We replace magnetrons, high-voltage diodes, HV capacitors, turntable synchronous motors, mica wave guide sheets, and touch membrane keypads.',
-    serviceProcess: [
-      { step: 1, title: 'High-Voltage Discharge & Safety', desc: 'Safe grounding and discharge of high-voltage capacitor.' },
-      { step: 2, title: 'Component Resistance Testing', desc: 'Checking magnetron filament, HV diode, and door interlock switches.' },
-      { step: 3, title: 'Waveguide & Cavity Inspection', desc: 'Replacing burnt mica sheets and inspecting paint integrity.' },
-      { step: 4, title: 'Radiation Leakage & Water Heat Test', desc: 'RF radiation monitor check and standard water temperature rise test.' }
-    ],
-    benefits: [
-      '100% genuine magnetrons with warranty',
-      'High-voltage safety certified technicians',
-      'Mica waveguide sheet replacement on spot',
-      'Touch keypad membrane repair'
-    ],
-    faqList: [
-      { question: 'Is it worth repairing a microwave that is not heating?', answer: 'Yes! In 90% of cases, it is simply a blown high-voltage diode, fuse, or faulty magnetron, which can be repaired at a fraction of the cost of a new appliance.' }
-    ]
-  },
-  {
-    id: 'srv-tv',
-    slug: 'tv-service-repair',
-    name: 'LED, OLED & Smart TV Service & Panel Repair',
-    shortName: 'TV Service & Repair',
-    tagline: 'Backlight replacement, display panel bonding, motherboard & sound repair',
-    iconName: 'Tv',
-    imageUrl: 'https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?auto=format&fit=crop&w=800&q=80',
-    startingPrice: 399,
-    durationMinutes: 60,
-    warrantyDays: 30,
-    popular: false,
-    commonProblems: [
-      'Sound is clear but screen is completely dark',
-      'Horizontal or vertical colored lines on display',
-      'TV stuck on brand boot logo / continuous restart',
-      'HDMI ports not detecting signal / WiFi disconnected',
-      'Power indicator blinking with no display',
-      'Internal speaker buzzing or no audio output'
-    ],
-    description: 'Precision television repairs from 24-inch to 75-inch screens. We specialize in LED backlight strip replacements, SMPS power supply boards, T-Con timing controllers, mainboards, and software firmware flashing.',
-    serviceProcess: [
-      { step: 1, title: 'Display & Backlight Diagnostic', desc: 'Flashlight inspection to determine backlight LED vs. panel failure.' },
-      { step: 2, title: 'Power Board Voltage Metering', desc: 'Measuring 12V, 24V, and standby rails on power supply unit.' },
-      { step: 3, title: 'Board / Strip Component Replacement', desc: 'Swapping faulty LED arrays with aluminum-backed heat-sink strips.' },
-      { step: 4, title: 'Burn-In & Pixel Uniformity Test', desc: '30-minute stress test with color bar calibration.' }
-    ],
-    benefits: [
-      'Premium high-brightness aluminum LED backlight arrays',
-      'T-Con and motherboard repairs at chip level',
-      'Original remote controls & wall mount brackets',
-      'Safe on-site and authorized lab handling'
-    ],
-    faqList: [
-      { question: 'Why does my TV have audio but no picture?', answer: 'This is the classic symptom of failed LED backlights. The display panel is fine, and replacing the backlight strip will restore full picture brightness.' }
-    ]
-  },
-  {
-    id: 'srv-geyser',
-    slug: 'geyser-water-heater-service-repair',
-    name: 'Geyser & Water Heater Service & Heating Element Repair',
-    shortName: 'Geyser / Water Heater',
-    tagline: 'Instant & Storage water heater descaling, thermostat and element replacement',
-    iconName: 'Zap',
-    imageUrl: 'https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=800&q=80',
-    startingPrice: 299,
-    durationMinutes: 45,
-    warrantyDays: 30,
-    popular: true,
-    commonProblems: [
-      'Geyser not heating water / Tripping MCB switch',
-      'Water heating very slowly or lukewarm only',
-      'Water leaking from tank or inlet/outlet pipe',
-      'Electrical shock or earthing leakage from tap',
-      'Rusty, brown, or smelly hot water output',
-      'Thermostat indicator lights not turning on'
-    ],
-    description: 'Safe, certified electric and gas geyser maintenance. Hard water leads to thick calcium buildup on heating elements and inside tanks. Our technicians perform deep tank chemical descaling, anode rod replacement, and thermostat calibration.',
-    serviceProcess: [
-      { step: 1, title: 'Electrical Safety & Earthing Test', desc: 'Checking voltage, earthing continuity, and MCB cutoff.' },
-      { step: 2, title: 'Tank Draining & Sediment Flush', desc: 'Flushing calcium sediment and hard water lime scale.' },
-      { step: 3, title: 'Heating Element & Anode Check', desc: 'Inspecting magnesium sacrificial anode and copper heating coil.' },
-      { step: 4, title: 'Safety Valve Pressure Test', desc: 'Verifying pressure release valve (PRV) for safety.' }
-    ],
-    benefits: [
-      'ISI marked heavy-duty copper and glass-coated heating elements',
-      'Tank descaling boosts heating speed up to 40%',
-      'Multi-function safety valve replacements',
-      '30-Day post-service safety guarantee'
-    ],
-    faqList: [
-      { question: 'Why is my geyser tripping the home MCB when switched on?', answer: 'This indicates that the heating element casing has cracked or corroded, causing an electrical earth leakage. The element needs immediate replacement.' }
-    ]
-  },
-  {
-    id: 'srv-other',
-    slug: 'other-home-appliance-services',
-    name: 'Other Home Appliances Service & Multi-Brand Diagnostics',
-    shortName: 'Other Appliances',
-    tagline: 'Kitchen chimneys, induction cooktops, mixer grinders & general home gadgets',
-    iconName: 'Wrench',
-    imageUrl: 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80',
-    startingPrice: 249,
-    durationMinutes: 45,
-    warrantyDays: 30,
-    popular: false,
-    commonProblems: [
-      'Kitchen chimney suction weak / Baffle filters choked with grease',
-      'Induction cooktop error E0/E1 / No pan detection',
-      'Mixer grinder motor burning smell / Coupler broken',
-      'Air cooler motor humming / Water pump failure',
-      'General electrical diagnostic / Appliance wiring overhaul'
-    ],
-    description: 'Reliable repair solutions for all ancillary home electrical appliances. Our skilled technicians carry diagnostic tools and universal spare parts to service kitchen chimneys, induction plates, vacuum cleaners, and food processors.',
-    serviceProcess: [
-      { step: 1, title: 'Inspection & Symptom Analysis', desc: 'Testing power input, internal wiring, and mechanical parts.' },
-      { step: 2, title: 'Motor & Circuit Test', desc: 'Thermal overload and winding resistance check.' },
-      { step: 3, title: 'Deep Cleaning & Repair', desc: 'Degreasing chimney blowers and replacing damaged parts.' },
-      { step: 4, title: 'Operational Safety Verification', desc: 'Load test and safety check.' }
-    ],
-    benefits: [
-      'Skilled multi-craft technicians',
-      'Transparent flat diagnostic rates',
-      'Genuine replacement motors and switches',
-      'Doorstep convenience'
-    ],
-    faqList: [
-      { question: 'Can I book a general inspection if my appliance problem is not listed?', answer: 'Yes! Simply select Other Appliances and describe the symptom. Our technician will visit and provide a diagnostic estimate before starting work.' }
-    ]
-  }
-];
 
 export const SPARE_PARTS_LIST: SparePartProduct[] = [
   {
@@ -711,7 +411,7 @@ export const TESTIMONIALS: Testimonial[] = [
     rating: 5,
     date: '2 weeks ago',
     applianceServiced: 'LG Washing Machine Repair',
-    reviewText: 'Our front load washer drum stopped spinning with a loud humming noise. Sohom Enterprises sent their technician with the genuine replacement drive belt and starter capacitor. Fixed in under 45 minutes.',
+    reviewText: 'Our front load washer drum stopped spinning with a loud humming noise. Soham Enterprises sent their technician with the genuine replacement drive belt and starter capacitor. Fixed in under 45 minutes.',
     verified: true
   },
   {
@@ -719,7 +419,7 @@ export const TESTIMONIALS: Testimonial[] = [
     name: 'Debjani Bhattacharya',
     location: 'Jadavpur (CLIENT DATA REQUIRED)',
     rating: 5,
-    date: '3 weeks ago',
+    date: '2 weeks ago',
     applianceServiced: 'Geyser Heating Element Replacement',
     reviewText: 'The geyser was tripping our main circuit breaker. The technician brought a heavy copper 2000W element, replaced the corroded anode, and descaled the internal tank. Courteous, professional, and on time.',
     verified: true
@@ -730,8 +430,8 @@ export const FAQS_LIST: FaqItem[] = [
   {
     id: 'faq-1',
     category: 'general',
-    question: 'What is Sohom Enterprises and what areas do you serve?',
-    answer: 'Sohom Enterprises is a professional doorstep home appliance service, maintenance, and genuine spare parts provider. We currently serve urban residential and commercial locations with verified, certified technicians.'
+    question: 'What is Soham Enterprises and what areas do you serve?',
+    answer: 'Soham Enterprises is a professional doorstep home appliance service, maintenance, and genuine spare parts provider. We currently serve urban residential and commercial locations with verified, certified technicians.'
   },
   {
     id: 'faq-2',
@@ -749,7 +449,7 @@ export const FAQS_LIST: FaqItem[] = [
     id: 'faq-4',
     category: 'parts',
     question: 'Are the spare parts sold on your website genuine and under warranty?',
-    answer: '100% yes. All spare parts supplied by Sohom Enterprises are OEM-certified or verified high-grade compatible components with up to 12 months manufacturer warranty.'
+    answer: '100% yes. All spare parts supplied by Soham Enterprises are OEM-certified or verified high-grade compatible components with up to 12 months manufacturer warranty.'
   },
   {
     id: 'faq-5',

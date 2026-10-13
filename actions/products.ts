@@ -25,13 +25,16 @@ export async function getProducts(query?: {
 }) {
   const validatedQuery = productQuerySchema.parse(query || {});
 
-  const whereClause: any = { active: true };
+  const whereClause: any = {
+    active: true,
+    category: { is: { active: true } },
+  };
 
   if (validatedQuery.categoryId) {
     whereClause.categoryId = validatedQuery.categoryId;
   }
   if (validatedQuery.categorySlug) {
-    whereClause.category = { slug: validatedQuery.categorySlug };
+    whereClause.category.is.slug = validatedQuery.categorySlug;
   }
   if (validatedQuery.brand) {
     whereClause.brand = { equals: validatedQuery.brand, mode: 'insensitive' };
@@ -92,13 +95,17 @@ export async function getProducts(query?: {
 export async function getProductBySlug(slug: string) {
   const { slug: validatedSlug } = productSlugSchema.parse({ slug });
 
-  const product = await prisma.product.findUnique({
-    where: { slug: validatedSlug },
+  const product = await prisma.product.findFirst({
+    where: {
+      slug: validatedSlug,
+      active: true,
+      category: { is: { active: true } },
+    },
     include: {
       category: true,
       images: { orderBy: { sortOrder: 'asc' } },
       reviews: {
-        where: { active: true },
+        where: { isApproved: true },
         orderBy: { createdAt: 'desc' },
       },
     },
@@ -120,7 +127,7 @@ export async function getProductById(id: string) {
       category: true,
       images: { orderBy: { sortOrder: 'asc' } },
       reviews: {
-        where: { active: true },
+        where: { isApproved: true },
         orderBy: { createdAt: 'desc' },
       },
     },
@@ -138,7 +145,7 @@ export async function getProductCategories() {
     orderBy: { name: 'asc' },
     include: {
       _count: {
-        select: { products: true },
+        select: { products: { where: { active: true } } },
       },
     },
   });

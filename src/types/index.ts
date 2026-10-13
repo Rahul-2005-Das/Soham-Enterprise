@@ -13,9 +13,11 @@ export type PageRoute =
   | 'forgot-password'
   | 'reset-password'
   | 'profile'
-  | 'admin-users';
+  | 'admin-users'
+  | 'admin-login'
+  | 'admin-dashboard';
 
-export type UserRole = 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';
+export type UserRole = 'CUSTOMER' | 'ADMIN';
 
 export interface UserAddress {
   id: string;
@@ -33,6 +35,18 @@ export interface UserAddress {
   updatedAt: string;
 }
 
+export interface CustomerLocation {
+  label: string;
+  road: string | null;
+  neighbourhood: string | null;
+  city: string | null;
+  state: string | null;
+  pincode: string | null;
+  lat: number | null;
+  lng: number | null;
+  capturedAt: string;
+}
+
 export interface AuthUser {
   id: string;
   name: string;
@@ -44,36 +58,29 @@ export interface AuthUser {
   createdAt: string;
   updatedAt: string;
   addresses?: UserAddress[];
+  currentLocation?: CustomerLocation | null;
 }
 
 
-export type ApplianceType = 
-  | 'aquaguard' 
-  | 'ac' 
-  | 'refrigerator' 
-  | 'washing-machine' 
-  | 'microwave' 
-  | 'tv' 
-  | 'geyser' 
-  | 'other';
-
-export interface ServiceCategory {
+export interface PublishedService {
   id: string;
-  slug: string;
+  categoryId: string;
   name: string;
-  shortName: string;
-  tagline: string;
-  iconName: string;
-  imageUrl: string;
-  startingPrice: number;
-  durationMinutes: number;
-  warrantyDays: number;
-  popular: boolean;
-  commonProblems: string[];
+  slug: string;
   description: string;
-  serviceProcess: { step: number; title: string; desc: string }[];
-  benefits: string[];
-  faqList: { question: string; answer: string }[];
+  shortDescription: string | null;
+  brandApplicability: string | null;
+  inspectionFee: number | string;
+  estimatedDuration: string;
+  warrantyDays: number;
+  active: boolean;
+  category: {
+    id: string;
+    name: string;
+    slug: string;
+    active: boolean;
+    image: string | null;
+  };
 }
 
 export interface SparePartProduct {
@@ -81,6 +88,7 @@ export interface SparePartProduct {
   slug: string;
   sku: string;
   name: string;
+  categoryId?: string;
   category: string;
   brand: string;
   price: number;

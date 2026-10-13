@@ -1,13 +1,18 @@
 import React from 'react';
 import { Wrench, Phone, Mail, MapPin, ShieldCheck, Clock, Award, CheckCircle2 } from 'lucide-react';
 import { PageRoute } from '../../types';
-import { COMPANY_INFO, SERVICES_LIST } from '../../data/mockData';
+import { COMPANY_INFO } from '../../data/mockData';
+import { useCatalog } from '../../context/CatalogContext';
+import { normalizePhoneForTel, normalizeWhatsappNumber, useSite } from '../../context/SiteContext';
 
 interface FooterProps {
   onNavigate: (page: PageRoute, params?: { serviceId?: string; productId?: string }) => void;
 }
 
 export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
+  const { services } = useCatalog();
+  const { settings } = useSite();
+  const whatsapp = normalizeWhatsappNumber(settings.whatsappNumber);
   const handleNav = (page: PageRoute, params?: { serviceId?: string; productId?: string }) => {
     onNavigate(page, params);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -24,7 +29,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
             </div>
             <div>
               <h4 className="text-white text-sm font-bold">30-Day Service Warranty</h4>
-              <p className="text-xs text-slate-400 mt-0.5">Free revisit guarantee on all repair work.</p>
+              <p className="text-xs text-slate-400 mt-0.5">{settings.serviceTerms}</p>
             </div>
           </div>
 
@@ -66,31 +71,42 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
           {/* Brand Col */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => handleNav('home')}>
-              <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md">
-                <Wrench className="w-5 h-5" />
-              </div>
+              {settings.logoUrl
+                ? <img src={settings.logoUrl} alt="Soham Enterprises" className="h-10 w-10 rounded-xl object-contain" />
+                : <div className="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-md"><Wrench className="w-5 h-5" /></div>}
               <span className="text-2xl font-black text-white tracking-tight">
-                Sohom <span className="text-blue-500 font-extrabold">Enterprises</span>
+                {settings.storeName}
               </span>
             </div>
 
             <p className="text-sm text-slate-400 leading-relaxed max-w-sm">
-              {COMPANY_INFO.tagline}. Leading service, maintenance, and genuine spare parts platform for all major home appliance brands.
+              {settings.aboutUs || `${COMPANY_INFO.tagline}. Leading service, maintenance, and genuine spare parts platform for all major home appliance brands.`}
             </p>
 
             <div className="pt-2 text-xs text-slate-400 space-y-2">
-              <div className="flex items-center gap-2">
+              {settings.phone && <a href={`tel:${normalizePhoneForTel(settings.phone)}`} className="flex items-center gap-2 hover:text-white">
                 <Phone className="w-4 h-4 text-blue-400" />
-                <span>{COMPANY_INFO.phone}</span>
-              </div>
-              <div className="flex items-center gap-2">
+                <span>{settings.phone}</span>
+              </a>}
+              {whatsapp && <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent('Hello Soham Enterprises')}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-white">
+                <Phone className="w-4 h-4 text-emerald-400" />
+                <span>{settings.whatsappNumber}</span>
+              </a>}
+              {settings.supportEmail && <a href={`mailto:${settings.supportEmail}`} className="flex items-center gap-2 hover:text-white">
                 <Mail className="w-4 h-4 text-sky-400" />
-                <span>{COMPANY_INFO.email}</span>
-              </div>
-              <div className="flex items-start gap-2">
+                <span>{settings.supportEmail}</span>
+              </a>}
+              {settings.shopAddress && <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <span>{COMPANY_INFO.address}</span>
-              </div>
+                <span>{settings.shopAddress}</span>
+              </div>}
+              {(settings.facebookUrl || settings.instagramUrl || settings.youtubeUrl) && (
+                <div className="flex flex-wrap gap-3 pt-1">
+                  {settings.facebookUrl && <a href={settings.facebookUrl} target="_blank" rel="noreferrer" className="font-semibold hover:text-white">Facebook</a>}
+                  {settings.instagramUrl && <a href={settings.instagramUrl} target="_blank" rel="noreferrer" className="font-semibold hover:text-white">Instagram</a>}
+                  {settings.youtubeUrl && <a href={settings.youtubeUrl} target="_blank" rel="noreferrer" className="font-semibold hover:text-white">YouTube</a>}
+                </div>
+              )}
             </div>
           </div>
 
@@ -100,13 +116,13 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               Our Services
             </h4>
             <ul className="space-y-2 text-sm text-slate-400">
-              {SERVICES_LIST.slice(0, 6).map((srv) => (
+              {services.slice(0, 6).map((srv) => (
                 <li key={srv.id}>
                   <button
                     onClick={() => handleNav('service-detail', { serviceId: srv.id })}
                     className="hover:text-white transition text-left"
                   >
-                    {srv.shortName}
+                    {srv.shortDescription || srv.name}
                   </button>
                 </li>
               ))}
@@ -115,7 +131,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                   onClick={() => handleNav('services')}
                   className="text-blue-400 font-semibold hover:underline"
                 >
-                  View All 8 Services →
+                  View All Services →
                 </button>
               </li>
             </ul>
@@ -191,6 +207,11 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
                   Create New Account
                 </button>
               </li>
+              <li>
+                <button onClick={() => handleNav('admin-login')} className="text-slate-500 hover:text-blue-300 transition">
+                  Admin Portal
+                </button>
+              </li>
             </ul>
           </div>
         </div>
@@ -198,8 +219,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
 
       {/* Bottom Legal Bar */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 border-t border-slate-800 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p>© {new Date().getFullYear()} Sohom Enterprises. All rights reserved.</p>
-        <p className="text-slate-400">GSTIN: {COMPANY_INFO.gstin}</p>
+        <p>© {new Date().getFullYear()} {settings.storeName}. All rights reserved.</p>
         <div className="flex items-center gap-4">
           <span className="hover:text-slate-400 transition cursor-pointer">Privacy Policy</span>
           <span>•</span>

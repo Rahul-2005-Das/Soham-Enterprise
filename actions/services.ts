@@ -16,15 +16,15 @@ export async function getServices(query?: {
 }) {
   const validatedQuery = serviceQuerySchema.parse(query || {});
 
-  const whereClause: any = {};
-  if (validatedQuery.activeOnly) {
-    whereClause.active = true;
-  }
+  const whereClause: any = {
+    active: true,
+    category: { is: { active: true } },
+  };
   if (validatedQuery.categoryId) {
     whereClause.categoryId = validatedQuery.categoryId;
   }
   if (validatedQuery.categorySlug) {
-    whereClause.category = { slug: validatedQuery.categorySlug };
+    whereClause.category.is.slug = validatedQuery.categorySlug;
   }
   if (validatedQuery.search) {
     whereClause.OR = [
@@ -52,12 +52,16 @@ export async function getServices(query?: {
 export async function getServiceBySlug(slug: string) {
   const { slug: validatedSlug } = serviceSlugSchema.parse({ slug });
 
-  const service = await prisma.service.findUnique({
-    where: { slug: validatedSlug },
+  const service = await prisma.service.findFirst({
+    where: {
+      slug: validatedSlug,
+      active: true,
+      category: { is: { active: true } },
+    },
     include: {
       category: true,
       reviews: {
-        where: { active: true },
+        where: { isApproved: true },
         orderBy: { createdAt: 'desc' },
         take: 5,
       },

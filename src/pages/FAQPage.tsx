@@ -1,17 +1,32 @@
 import React, { useState } from 'react';
 import { Search, ChevronDown, HelpCircle, PhoneCall, MessageSquare } from 'lucide-react';
-import { FAQS_LIST, COMPANY_INFO } from '../data/mockData';
+import { FAQS_LIST } from '../data/mockData';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
+import { normalizePhoneForTel, normalizeWhatsappNumber, useSite } from '../context/SiteContext';
 
 export const FAQPage: React.FC = () => {
+  const { settings } = useSite();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [openIndex, setOpenIndex] = useState<string | null>(FAQS_LIST[0].id);
 
-  const categories = ['All', 'Booking & Inspection', 'Spare Parts & Authenticity', 'Warranty & Revisit', 'Technician Safety'];
+  const managedFaqs = settings.faqContent
+    .split(/\r?\n/)
+    .map((line, index) => {
+      const separator = line.indexOf('|');
+      if (separator < 1) return null;
+      const question = line.slice(0, separator).trim();
+      const answer = line.slice(separator + 1).trim();
+      return question && answer ? { id: `managed-faq-${index}`, category: 'Business information', question, answer } : null;
+    })
+    .filter((faq): faq is NonNullable<typeof faq> => faq !== null);
+  const faqs = managedFaqs.length > 0 ? managedFaqs : FAQS_LIST;
+  const categories = managedFaqs.length > 0
+    ? ['All', 'Business information']
+    : ['All', 'Booking & Inspection', 'Spare Parts & Authenticity', 'Warranty & Revisit', 'Technician Safety'];
 
-  const filteredFaqs = FAQS_LIST.filter((faq) => {
+  const filteredFaqs = faqs.filter((faq) => {
     const matchesSearch =
       faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
       faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
@@ -21,6 +36,8 @@ export const FAQPage: React.FC = () => {
 
     return matchesSearch && matchesCategory;
   });
+  const phone = settings.phone.trim();
+  const whatsapp = normalizeWhatsappNumber(settings.whatsappNumber);
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
@@ -118,22 +135,22 @@ export const FAQPage: React.FC = () => {
             Our customer service specialists are ready to answer your questions and assist with appliance diagnoses.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
-            <a
-              href={`tel:${COMPANY_INFO.phone}`}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition"
+            {phone && <a
+              href={`tel:${normalizePhoneForTel(phone)}`}
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-blue-700"
             >
-              <PhoneCall className="w-4 h-4" />
-              <span>Call {COMPANY_INFO.phone}</span>
-            </a>
-            <a
-              href={`https://wa.me/${COMPANY_INFO.whatsapp.replace(/\D/g, '')}`}
+              <PhoneCall className="h-4 w-4" />
+              <span>Call {phone}</span>
+            </a>}
+            {whatsapp && <a
+              href={`https://wa.me/${whatsapp}?text=${encodeURIComponent('Hello Soham Enterprises')}`}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition"
+              className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700"
             >
-              <MessageSquare className="w-4 h-4" />
+              <MessageSquare className="h-4 w-4" />
               <span>Chat on WhatsApp</span>
-            </a>
+            </a>}
           </div>
         </Card>
       </div>

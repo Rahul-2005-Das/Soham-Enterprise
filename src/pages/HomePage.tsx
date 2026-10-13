@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Wrench,
   ShoppingBag,
@@ -12,21 +12,18 @@ import {
   PhoneCall,
   Sparkles,
   Search,
-  Droplets,
-  Wind,
-  Refrigerator as FridgeIcon,
-  Shirt,
-  Flame,
-  Tv,
-  Zap
 } from 'lucide-react';
 import { PageRoute } from '../types';
-import { SERVICES_LIST, TESTIMONIALS, FAQS_LIST, COMPANY_INFO } from '../data/mockData';
+import { FAQS_LIST, COMPANY_INFO } from '../data/mockData';
 import { useCatalog } from '../context/CatalogContext';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { Section } from '../components/ui/Section';
+import { PromoBannerCarousel } from '../components/PromoBannerCarousel';
+import { ProductImage } from '../components/ProductImage';
+import { useSite } from '../context/SiteContext';
+import { ReviewSubmissionForm } from '../components/reviews/ReviewSubmissionForm';
 
 interface HomePageProps {
   onNavigate: (page: PageRoute, params?: { serviceId?: string; productId?: string }) => void;
@@ -39,35 +36,44 @@ export const HomePage: React.FC<HomePageProps> = ({
   onOpenBooking,
   onAddToCart
 }) => {
-  const [selectedHeroAppliance, setSelectedHeroAppliance] = useState(SERVICES_LIST[0].id);
-  const { products: catalogProducts, loading: productsLoading } = useCatalog();
+  const [selectedHeroAppliance, setSelectedHeroAppliance] = useState('');
+  const [approvedReviews, setApprovedReviews] = useState<Array<{
+    id: string; rating: number; title: string | null; comment: string; imageUrl: string | null;
+    userName: string; serviceName: string | null; isFeatured: boolean;
+    user: { name: string } | null; product: { name: string } | null; service: { name: string } | null;
+  }>>([]);
+  const [reviewAggregate, setReviewAggregate] = useState({ averageRating: 0, count: 0 });
+  const { products: catalogProducts, loading: productsLoading, services, servicesLoading, servicesError } = useCatalog();
+  const { settings, language, t } = useSite();
+
+  useEffect(() => {
+    let mounted = true;
+    fetch('/api/reviews', { credentials: 'include', cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json();
+        if (!response.ok || !payload.success) throw new Error(payload.error || 'Could not load approved reviews.');
+        if (mounted) setReviewAggregate(payload.aggregate || { averageRating: 0, count: payload.reviews.length });
+        return payload.reviews;
+      })
+      .then((reviews) => { if (mounted) setApprovedReviews(reviews); })
+      .catch((error: unknown) => console.warn('[HomePage] Approved customer reviews are unavailable:', error));
+    return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!services.some((service) => service.id === selectedHeroAppliance)) {
+      setSelectedHeroAppliance(services[0]?.id || '');
+    }
+  }, [services, selectedHeroAppliance]);
 
   // Helper icon mapper
-  const renderApplianceIcon = (name: string, className = "w-6 h-6") => {
-    switch (name) {
-      case 'Droplets':
-        return <Droplets className={className} />;
-      case 'Wind':
-        return <Wind className={className} />;
-      case 'Refrigerator':
-        return <FridgeIcon className={className} />;
-      case 'Shirt':
-        return <Shirt className={className} />;
-      case 'Flame':
-        return <Flame className={className} />;
-      case 'Tv':
-        return <Tv className={className} />;
-      case 'Zap':
-        return <Zap className={className} />;
-      default:
-        return <Wrench className={className} />;
-    }
-  };
+  const renderApplianceIcon = (_name: string, className = "w-6 h-6") => <Wrench className={className} />;
 
   return (
     <div className="flex flex-col min-h-screen">
       {/* 1. HERO SECTION */}
       <section className="relative bg-gradient-to-b from-blue-50/70 via-white to-slate-50 pt-12 pb-20 md:pt-20 md:pb-28 overflow-hidden border-b border-slate-200/60">
+        {settings.homeBannerUrl && <img src={settings.homeBannerUrl} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-10" />}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             {/* Left Hero Column */}
@@ -78,11 +84,15 @@ export const HomePage: React.FC<HomePageProps> = ({
               </div>
 
               <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-slate-900 tracking-tight leading-[1.15]">
-                Fast, Reliable <span className="text-blue-600">Appliance Repairs</span> & Genuine Spare Parts
+                {settings.heroTitle || (language === 'en'
+                  ? <>Fast, Reliable <span className="text-blue-600">Appliance Repairs</span> &amp; Genuine Spare Parts</>
+                  : t('heroTitle'))}
               </h1>
 
               <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-2xl mx-auto lg:mx-0">
-                {COMPANY_INFO.tagline}. Doorstep service for Aquaguard, AC, Refrigerator, Washing Machine, Microwave, TV, and Geysers with transparent pricing and 30-day warranty.
+                {settings.heroSubtitle || (language === 'en'
+                  ? `${COMPANY_INFO.tagline}. Browse our currently published services and book a doorstep visit with transparent pricing.`
+                  : t('heroSubtitle'))}
               </p>
 
               {/* Dual Action CTAs */}
@@ -95,7 +105,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   onClick={() => onOpenBooking()}
                   id="hero-book-btn"
                 >
-                  Book a Technician Visit
+                  {t('bookTechnician')}
                 </Button>
 
                 <Button
@@ -106,7 +116,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   onClick={() => onNavigate('spare-parts')}
                   id="hero-shop-btn"
                 >
-                  Shop Spare Parts
+                  {t('shopParts')}
                 </Button>
               </div>
 
@@ -145,7 +155,11 @@ export const HomePage: React.FC<HomePageProps> = ({
                       Select Appliance
                     </label>
                     <div className="grid grid-cols-2 gap-2">
-                      {SERVICES_LIST.slice(0, 6).map((srv) => (
+                      {servicesLoading ? (
+                        <p className="col-span-2 py-4 text-center text-xs text-slate-500">Loading services…</p>
+                      ) : servicesError ? (
+                        <p role="alert" className="col-span-2 py-4 text-center text-xs text-rose-700">{servicesError}</p>
+                      ) : services.map((srv) => (
                         <button
                           key={srv.id}
                           type="button"
@@ -157,30 +171,38 @@ export const HomePage: React.FC<HomePageProps> = ({
                           }`}
                         >
                           <span className="text-blue-600 shrink-0">
-                            {renderApplianceIcon(srv.iconName, 'w-4 h-4')}
+                            {renderApplianceIcon(srv.name, 'w-4 h-4')}
                           </span>
-                          <span className="truncate">{srv.shortName}</span>
+                          <span className="truncate">{srv.shortDescription || srv.name}</span>
                         </button>
                       ))}
                     </div>
                   </div>
 
                   {(() => {
-                    const currentSrv = SERVICES_LIST.find((s) => s.id === selectedHeroAppliance) || SERVICES_LIST[0];
+                    const currentSrv = services.find((service) => service.id === selectedHeroAppliance);
                     return (
                       <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-500">Inspection Fee:</span>
-                          <span className="font-bold text-slate-900">₹{currentSrv.startingPrice} only</span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-500">Avg Duration:</span>
-                          <span className="font-medium text-slate-800">{currentSrv.durationMinutes} mins</span>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-slate-500">Warranty:</span>
-                          <span className="text-emerald-700 font-bold">{currentSrv.warrantyDays}-Day Workmanship</span>
-                        </div>
+                        {currentSrv ? (
+                          <>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-500">Inspection Fee:</span>
+                              <span className="font-bold text-slate-900">₹{Number(currentSrv.inspectionFee)} only</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-500">Estimated Duration:</span>
+                              <span className="font-medium text-slate-800">{currentSrv.estimatedDuration}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-slate-500">Warranty:</span>
+                              <span className="text-emerald-700 font-bold">{currentSrv.warrantyDays}-Day Workmanship</span>
+                            </div>
+                          </>
+                        ) : (
+                          <p className="text-center text-xs text-slate-500">
+                            {servicesLoading ? 'Loading service details…' : 'No published services are available right now.'}
+                          </p>
+                        )}
                       </div>
                     );
                   })()}
@@ -188,7 +210,8 @@ export const HomePage: React.FC<HomePageProps> = ({
                   <Button
                     variant="primary"
                     className="w-full justify-center py-3 text-sm font-bold shadow-blue-500/20"
-                    onClick={() => onOpenBooking(selectedHeroAppliance)}
+                    disabled={!selectedHeroAppliance || servicesLoading}
+                    onClick={() => onOpenBooking(selectedHeroAppliance || undefined)}
                   >
                     Schedule Technician Visit Now →
                   </Button>
@@ -204,7 +227,12 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </section>
 
-      {/* 2. SERVICES CATEGORIES (ALL 8 CORE APPLIANCES) */}
+      <PromoBannerCarousel />
+      {settings.offerBannerText && <section aria-label="Current offer" className="mx-auto w-full max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
+        <p className="whitespace-pre-wrap rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-center text-base font-bold text-amber-950 shadow-sm">{settings.offerBannerText}</p>
+      </section>}
+
+      {/* 2. Published services */}
       <Section
         id="services-overview"
         badge="Doorstep Repairs"
@@ -214,7 +242,13 @@ export const HomePage: React.FC<HomePageProps> = ({
         background="white"
       >
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {SERVICES_LIST.map((service) => (
+          {servicesLoading ? (
+            <p className="col-span-full py-8 text-center text-sm text-slate-500">Loading published services…</p>
+          ) : servicesError ? (
+            <p role="alert" className="col-span-full py-8 text-center text-sm text-rose-700">{servicesError}</p>
+          ) : services.length === 0 ? (
+            <p className="col-span-full py-8 text-center text-sm text-slate-500">No published services are available right now.</p>
+          ) : services.map((service) => (
             <Card
               key={service.id}
               hoverEffect
@@ -223,36 +257,28 @@ export const HomePage: React.FC<HomePageProps> = ({
             >
               <div>
                 <div className="relative h-44 rounded-xl overflow-hidden mb-4 bg-slate-100">
-                  <img
-                    src={service.imageUrl}
-                    alt={service.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm p-2 rounded-xl shadow-sm text-blue-600">
-                    {renderApplianceIcon(service.iconName, 'w-5 h-5')}
-                  </div>
-                  {service.popular && (
-                    <div className="absolute top-3 right-3 bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider">
-                      Popular
-                    </div>
+                  {service.category.image ? (
+                    <img src={service.category.image} alt={service.category.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-blue-600"><Wrench className="h-10 w-10" /></div>
                   )}
                 </div>
 
                 <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition">
-                  {service.shortName}
+                {service.shortDescription || service.name}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                  {service.tagline}
+                {service.description}
                 </p>
 
                 <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                   <div>
                     <span className="text-[10px] text-slate-400 block">Inspection from</span>
-                    <span className="text-base font-extrabold text-blue-600">₹{service.startingPrice}</span>
+                    <span className="text-base font-extrabold text-blue-600">₹{Number(service.inspectionFee)}</span>
                   </div>
                   <span className="text-xs text-slate-500 font-medium flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5 text-slate-400" />
-                    {service.durationMinutes} mins
+                    {service.estimatedDuration}
                   </span>
                 </div>
               </div>
@@ -285,9 +311,9 @@ export const HomePage: React.FC<HomePageProps> = ({
 
       {/* 3. WHY CHOOSE US (TRUST BADGES) */}
       <Section
-        badge="The Sohom Advantage"
+        badge="The Soham Advantage"
         badgeVariant="sky"
-        title="Why Homeowners Trust Sohom Enterprises"
+        title="Why Homeowners Trust Soham Enterprises"
         subtitle="We deliver quality workmanship with transparent pricing, genuine replacement components, and responsive support."
         background="light"
       >
@@ -405,7 +431,7 @@ export const HomePage: React.FC<HomePageProps> = ({
           </p>
         ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {catalogProducts.slice(0, 4).map((part) => (
+          {catalogProducts.map((part) => (
             <Card
               key={part.id}
               hoverEffect
@@ -416,7 +442,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                   className="relative h-44 rounded-xl overflow-hidden mb-3 bg-white p-2 cursor-pointer"
                   onClick={() => onNavigate('product-detail', { productId: part.id })}
                 >
-                  <img
+                  <ProductImage
                     src={part.imageUrl}
                     alt={part.name}
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
@@ -501,41 +527,55 @@ export const HomePage: React.FC<HomePageProps> = ({
         </div>
       </Section>
 
-      {/* 6. TESTIMONIALS & REVIEWS UI */}
       <Section
+        badge="Your Feedback Matters"
+        badgeVariant="amber"
+        title="Tell us how we did"
+        subtitle="Share your experience with our team. Reviews are published after moderation."
+        background="light"
+      >
+        <div className="mx-auto max-w-3xl">
+          <ReviewSubmissionForm />
+        </div>
+      </Section>
+
+      {/* 6. TESTIMONIALS & REVIEWS UI */}
+      {approvedReviews.length > 0 && <Section
         badge="Customer Feedback"
         badgeVariant="amber"
-        title="Verified Doorstep Service Reviews"
-        subtitle="Real experiences from residents and homeowners serviced by Sohom Enterprises."
+        title="Customer Reviews & Testimonials"
+        subtitle={`${reviewAggregate.averageRating.toFixed(1)} ★ average from ${reviewAggregate.count} approved ${reviewAggregate.count === 1 ? 'review' : 'reviews'}.`}
         background="white"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {TESTIMONIALS.map((t) => (
-            <Card key={t.id} className="p-5 border-slate-200/80 flex flex-col justify-between">
+          {approvedReviews.map((review) => (
+            <Card key={review.id} className="p-5 border-slate-200/80 flex flex-col justify-between">
               <div>
                 <div className="flex items-center gap-1 text-amber-500 mb-3">
-                  {[...Array(t.rating)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 fill-current" />
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'fill-current' : 'text-slate-300'}`} />
                   ))}
+                  <span className="sr-only">{review.rating} out of 5 stars</span>
                 </div>
                 <p className="text-xs text-slate-600 italic leading-relaxed">
-                  "{t.reviewText}"
+                  “{review.comment}”
                 </p>
+                {review.imageUrl && <img src={review.imageUrl} alt={`Photo shared by ${review.user?.name || review.userName}`} loading="lazy" className="mt-3 h-20 w-20 rounded-lg object-cover" />}
               </div>
 
               <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                 <div>
-                  <h5 className="text-xs font-bold text-slate-900">{t.name}</h5>
-                  <p className="text-[10px] text-slate-400">{t.location}</p>
+                  <h5 className="text-xs font-bold text-slate-900">{review.user?.name || review.userName || 'Customer'}</h5>
+                  <p className="text-[10px] text-slate-400">{review.title || 'Customer review'}</p>
                 </div>
                 <Badge variant="blue" size="sm">
-                  {t.applianceServiced}
+                  {review.product?.name || review.service?.name || review.serviceName || 'Customer'}
                 </Badge>
               </div>
             </Card>
           ))}
         </div>
-      </Section>
+      </Section>}
 
       {/* 7. FAQ PREVIEW */}
       <Section
@@ -591,13 +631,13 @@ export const HomePage: React.FC<HomePageProps> = ({
               Book Service Online Now
             </Button>
 
-            <a
-              href={`tel:${COMPANY_INFO.emergencyPhone.split(' ')[0]}`}
+            {settings.phone ? <a
+              href={`tel:${settings.phone.replace(/[^\d+]/g, '')}`}
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-white font-medium text-base transition"
             >
               <PhoneCall className="w-5 h-5 text-sky-400" />
-              <span>Call Emergency Desk</span>
-            </a>
+              <span>Call Support</span>
+            </a> : <Button variant="outline" size="lg" onClick={() => onNavigate('contact')}>Contact Support</Button>}
           </div>
         </div>
       </section>

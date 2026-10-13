@@ -1,23 +1,22 @@
 import { Request } from 'express';
+import { mapApiError } from '../_errors.ts';
 import {
   getAdminDashboardStats,
   getAdminBookings,
+  getAdminBookingReport,
   getAdminBookingById,
   updateAdminBookingStatus,
-  assignTechnicianToBooking,
   updateAdminBookingNotes,
-  getAdminTechnicians,
-  updateAdminTechnician,
+  deleteAdminBooking,
   getAdminStaff,
   getAdminCustomers,
 } from '../../../actions/admin.ts';
 import {
-  assignTechnicianSchema,
   updateBookingStatusSchema,
   updateBookingNotesSchema,
-  updateTechnicianSchema,
 } from '../../../schemas/admin.ts';
 import { requireRole } from '../../../actions/auth-helper.ts';
+import { ORDER_REPORT_PERIODS } from '../../../lib/order-report.ts';
 
 // Helper to enforce admin role
 function checkAdmin(req: Request) {
@@ -30,11 +29,8 @@ export async function handleAdminDashboard(req: Request) {
     const data = await getAdminDashboardStats();
     return { status: 200, body: { success: true, ...data } };
   } catch (error: any) {
-    const isAuth = error.message?.includes('Unauthorized') || error.message?.includes('Forbidden');
-    return {
-      status: error.message?.includes('Forbidden') ? 403 : isAuth ? 401 : 500,
-      body: { success: false, error: error.message || 'Failed to load admin dashboard' },
-    };
+    const mapped = mapApiError(error, 'Failed to load admin dashboard');
+    return { status: mapped.status, body: { success: false, error: mapped.error } };
   }
 }
 
@@ -44,18 +40,29 @@ export async function handleAdminGetBookings(req: Request) {
     const filters = {
       status: req.query.status as string | undefined,
       serviceId: req.query.serviceId as string | undefined,
-      technicianId: req.query.technicianId as string | undefined,
       date: req.query.date as string | undefined,
       search: req.query.search as string | undefined,
     };
     const bookings = await getAdminBookings(filters);
     return { status: 200, body: { success: true, bookings } };
   } catch (error: any) {
-    const isAuth = error.message?.includes('Unauthorized') || error.message?.includes('Forbidden');
-    return {
-      status: error.message?.includes('Forbidden') ? 403 : isAuth ? 401 : 500,
-      body: { success: false, error: error.message || 'Failed to fetch bookings' },
-    };
+    const mapped = mapApiError(error, 'Failed to fetch bookings');
+    return { status: mapped.status, body: { success: false, error: mapped.error, bookings: [] } };
+  }
+}
+
+export async function handleAdminBookingReport(req: Request) {
+  try {
+    checkAdmin(req);
+    const period = String(req.query.period || '');
+    if (!ORDER_REPORT_PERIODS.includes(period as typeof ORDER_REPORT_PERIODS[number])) {
+      return { status: 400, body: { success: false, error: 'Choose a valid booking report period.' } };
+    }
+    const bookings = await getAdminBookingReport(period as typeof ORDER_REPORT_PERIODS[number]);
+    return { status: 200, body: { success: true, period, bookings } };
+  } catch (error: any) {
+    const mapped = mapApiError(error, 'Could not generate booking report.');
+    return { status: mapped.status, body: { success: false, error: mapped.error } };
   }
 }
 
@@ -65,12 +72,8 @@ export async function handleAdminGetBookingById(id: string, req: Request) {
     const booking = await getAdminBookingById(id);
     return { status: 200, body: { success: true, booking } };
   } catch (error: any) {
-    const isAuth = error.message?.includes('Unauthorized') || error.message?.includes('Forbidden');
-    const isNotFound = error.message?.includes('not found');
-    return {
-      status: error.message?.includes('Forbidden') ? 403 : isAuth ? 401 : isNotFound ? 404 : 500,
-      body: { success: false, error: error.message || 'Failed to fetch booking details' },
-    };
+    const mapped = mapApiError(error, 'Failed to fetch booking details');
+    return { status: mapped.status, body: { success: false, error: mapped.error } };
   }
 }
 
@@ -81,36 +84,12 @@ export async function handleAdminUpdateBookingStatus(id: string, body: any, req:
     const updated = await updateAdminBookingStatus(id, validated.status);
     return { status: 200, body: { success: true, booking: updated } };
   } catch (error: any) {
-    const isAuth = error.message?.includes('Unauthorized') || error.message?.includes('Forbidden');
-    const isZod = error.errors && Array.isArray(error.errors);
-    return {
-      status: isZod ? 400 : error.message?.includes('Forbidden') ? 403 : isAuth ? 401 : 500,
-      body: {
-        success: false,
-        error: isZod ? error.errors[0]?.message || 'Invalid status value' : error.message,
-      },
-    };
+    const mapped = mapApiError(error, 'Invalid status value');
+    return { status: mapped.status, body: { success: false, error: mapped.error } };
   }
 }
 
-export async function handleAdminAssignTechnician(id: string, body: any, req: Request) {
-  try {
-    checkAdmin(req);
-    const validated = assignTechnicianSchema.parse(body);
-    const updated = await assignTechnicianToBooking(id, validated.technicianId ?? null);
-    return { status: 200, body: { success: true, booking: updated } };
-  } catch (error: any) {
-    const isAuth = error.message?.includes('Unauthorized') || error.message?.includes('Forbidden');
-    const isZod = error.errors && Array.isArray(error.errors);
-    return {
-      status: isZod ? 400 : error.message?.includes('Forbidden') ? 403 : isAuth ? 401 : 500,
-      body: {
-        success: false,
-        error: isZod ? error.errors[0]?.message || 'Invalid assignment input' : error.message,
-      },
-    };
-  }
-}
+
 
 export async function handleAdminUpdateBookingNotes(id: string, body: any, req: Request) {
   try {
@@ -119,46 +98,23 @@ export async function handleAdminUpdateBookingNotes(id: string, body: any, req: 
     const updated = await updateAdminBookingNotes(id, validated);
     return { status: 200, body: { success: true, booking: updated } };
   } catch (error: any) {
-    const isAuth = error.message?.includes('Unauthorized') || error.message?.includes('Forbidden');
-    const isZod = error.errors && Array.isArray(error.errors);
-    return {
-      status: isZod ? 400 : error.message?.includes('Forbidden') ? 403 : isAuth ? 401 : 500,
-      body: {
-        success: false,
-        error: isZod ? error.errors[0]?.message || 'Invalid notes input' : error.message,
-      },
-    };
+    const mapped = mapApiError(error, 'Invalid notes input');
+    return { status: mapped.status, body: { success: false, error: mapped.error } };
   }
 }
 
-export async function handleAdminGetTechnicians(req: Request) {
+export async function handleAdminDeleteBooking(id: string, req: Request) {
   try {
     checkAdmin(req);
-    const technicians = await getAdminTechnicians();
-    return { status: 200, body: { success: true, technicians } };
+    const result = await deleteAdminBooking(id);
+    return { status: 200, body: result };
   } catch (error: any) {
-    const isAuth = error.message?.includes('Unauthorized') || error.message?.includes('Forbidden');
-    return {
-      status: error.message?.includes('Forbidden') ? 403 : isAuth ? 401 : 500,
-      body: { success: false, error: error.message || 'Failed to fetch technicians' },
-    };
+    const mapped = mapApiError(error, 'Could not delete booking');
+    return { status: mapped.status, body: { success: false, error: mapped.error } };
   }
 }
 
-export async function handleAdminUpdateTechnician(id: string, body: any, req: Request) {
-  try {
-    checkAdmin(req);
-    const validated = updateTechnicianSchema.parse(body);
-    const updated = await updateAdminTechnician(id, validated);
-    return { status: 200, body: { success: true, technician: updated } };
-  } catch (error: any) {
-    const isAuth = error.message?.includes('Unauthorized') || error.message?.includes('Forbidden');
-    return {
-      status: error.message?.includes('Forbidden') ? 403 : isAuth ? 401 : 500,
-      body: { success: false, error: error.message || 'Failed to update technician' },
-    };
-  }
-}
+
 
 export async function handleAdminGetStaff(req: Request) {
   try {
@@ -170,11 +126,8 @@ export async function handleAdminGetStaff(req: Request) {
     const staff = await getAdminStaff(filters);
     return { status: 200, body: { success: true, staff } };
   } catch (error: any) {
-    const isAuth = error.message?.includes('Unauthorized') || error.message?.includes('Forbidden');
-    return {
-      status: error.message?.includes('Forbidden') ? 403 : isAuth ? 401 : 500,
-      body: { success: false, error: error.message || 'Failed to fetch staff' },
-    };
+    const mapped = mapApiError(error, 'Failed to fetch staff');
+    return { status: mapped.status, body: { success: false, error: mapped.error } };
   }
 }
 
@@ -187,10 +140,7 @@ export async function handleAdminGetCustomers(req: Request) {
     const customers = await getAdminCustomers(filters);
     return { status: 200, body: { success: true, customers } };
   } catch (error: any) {
-    const isAuth = error.message?.includes('Unauthorized') || error.message?.includes('Forbidden');
-    return {
-      status: error.message?.includes('Forbidden') ? 403 : isAuth ? 401 : 500,
-      body: { success: false, error: error.message || 'Failed to fetch customers' },
-    };
+    const mapped = mapApiError(error, 'Failed to fetch customers');
+    return { status: mapped.status, body: { success: false, error: mapped.error } };
   }
 }

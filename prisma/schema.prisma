@@ -9,14 +9,12 @@ generator client {
 
 enum Role {
   CUSTOMER
-  TECHNICIAN
   ADMIN
 }
 
 enum BookingStatus {
   PENDING
   CONFIRMED
-  TECHNICIAN_ASSIGNED
   ON_THE_WAY
   IN_PROGRESS
   COMPLETED
@@ -51,6 +49,17 @@ enum NotificationType {
   PROMOTIONAL
 }
 
+enum PasswordResetPurpose {
+  PASSWORD_RESET
+  AUTHENTICATION
+}
+
+enum ContactInquiryStatus {
+  NEW
+  CONTACTED
+  RESOLVED
+}
+
 // 1. User System
 model User {
   id            String    @id @default(cuid())
@@ -62,16 +71,18 @@ model User {
   image         String?
   emailVerified Boolean   @default(false)
   phoneVerified Boolean   @default(false)
+  deletedAt     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   addresses         Address[]
-  technicianProfile Technician?
+  currentLocation   CustomerLocation?
   bookings          ServiceBooking[]
   cart              Cart?
   orders            Order[]
   reviews           Review[]
   notifications     Notification[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([email])
   @@index([phone])
@@ -82,7 +93,7 @@ model User {
 model Address {
   id           String   @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Restrict)
   fullName     String
   phone        String
   addressLine1 String
@@ -92,6 +103,7 @@ model Address {
   pincode      String
   landmark     String?
   isDefault    Boolean  @default(false)
+  deletedAt    DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -100,6 +112,22 @@ model Address {
 
   @@index([userId])
   @@index([pincode])
+}
+
+model CustomerLocation {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  lat           Float?
+  lng           Float?
+  label         String
+  road          String?
+  neighbourhood String?
+  city          String?
+  state         String?
+  pincode       String?
+  capturedAt    DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // 3. Service Categories
@@ -129,6 +157,7 @@ model Service {
   slug              String          @unique
   description       String
   shortDescription  String?
+  brandApplicability String? @default("All Brands")
   inspectionFee     Decimal         @db.Decimal(10, 2)
   estimatedDuration String
   warrantyDays      Int             @default(30)
@@ -144,24 +173,6 @@ model Service {
   @@index([active])
 }
 
-// 5. Technicians
-model Technician {
-  id           String   @id @default(cuid())
-  userId       String   @unique
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  employeeCode String   @unique
-  skills       String[]
-  serviceAreas String[]
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  assignedBookings ServiceBooking[]
-
-  @@index([userId])
-  @@index([employeeCode])
-  @@index([active])
-}
 
 // 6. Service Bookings
 model ServiceBooking {
@@ -171,8 +182,6 @@ model ServiceBooking {
   user               User           @relation(fields: [userId], references: [id], onDelete: Restrict)
   serviceId          String
   service            Service        @relation(fields: [serviceId], references: [id], onDelete: Restrict)
-  technicianId       String?
-  technician         Technician?    @relation(fields: [technicianId], references: [id], onDelete: SetNull)
   addressId          String
   address            Address        @relation(fields: [addressId], references: [id], onDelete: Restrict)
   appliance          String
@@ -182,7 +191,6 @@ model ServiceBooking {
   status             BookingStatus  @default(PENDING)
   estimatedAmount    Decimal        @db.Decimal(10, 2)
   finalAmount        Decimal?       @db.Decimal(10, 2)
-  technicianNotes    String?
   customerNotes      String?
   completedAt        DateTime?
   createdAt          DateTime       @default(now())
@@ -191,7 +199,6 @@ model ServiceBooking {
   @@index([bookingNumber])
   @@index([userId])
   @@index([serviceId])
-  @@index([technicianId])
   @@index([status])
   @@index([preferredDate])
 }
@@ -199,6 +206,9 @@ model ServiceBooking {
 // 7. Product Categories
 model ProductCategory {
   id          String    @id @default(cuid())
+  parentId    String?
+  parent      ProductCategory?  @relation("ProductCategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children    ProductCategory[] @relation("ProductCategoryHierarchy")
   name        String
   slug        String    @unique
   description String?
@@ -211,6 +221,17 @@ model ProductCategory {
 
   @@index([slug])
   @@index([active])
+  @@index([parentId])
+}
+
+model Brand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  active    Boolean   @default(true)
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 }
 
 // 8. Products
@@ -218,6 +239,8 @@ model Product {
   id                String          @id @default(cuid())
   categoryId        String
   category          ProductCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  brandId           String?
+  brandRecord       Brand?          @relation(fields: [brandId], references: [id], onDelete: SetNull)
   name              String
   slug              String          @unique
   sku               String          @unique
@@ -225,8 +248,10 @@ model Product {
   description       String
   specifications    Json
   compatibility     String[]
+  tags              String[]        @default([])
   price             Decimal         @db.Decimal(10, 2)
   salePrice         Decimal?        @db.Decimal(10, 2)
+  shippingCharge    Decimal?        @db.Decimal(10, 2)
   stockQuantity     Int             @default(0)
   lowStockThreshold Int             @default(5)
   active            Boolean         @default(true)
@@ -242,6 +267,7 @@ model Product {
   @@index([slug])
   @@index([sku])
   @@index([brand])
+  @@index([brandId])
   @@index([active])
 }
 
@@ -263,7 +289,7 @@ model ProductImage {
 model Cart {
   id        String   @id @default(cuid())
   userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -299,6 +325,7 @@ model Order {
   shippingAmount Decimal     @default(0.00) @db.Decimal(10, 2)
   discountAmount Decimal     @default(0.00) @db.Decimal(10, 2)
   totalAmount    Decimal     @db.Decimal(10, 2)
+  trackingCode   String?
   status         OrderStatus @default(PENDING)
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
@@ -310,6 +337,21 @@ model Order {
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+}
+
+model Banner {
+  id          String   @id @default(cuid())
+  title       String
+  subtitle    String?
+  imageUrl    String
+  linkUrl     String?
+  buttonText  String?
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([active, sortOrder])
 }
 
 model OrderItem {
@@ -350,25 +392,54 @@ model Payment {
 
 // 13. Reviews
 model Review {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  productId String?
-  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
-  serviceId String?
-  service   Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
-  rating    Int
-  title     String?
-  comment   String
-  verified  Boolean  @default(false)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName    String   @default("Customer")
+  userEmail   String?
+  productId   String?
+  product     Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+  serviceId   String?
+  service     Service? @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  serviceName String?
+  imageUrl    String?
+  rating      Int      @default(5)
+  title       String?
+  comment     String
+  verified    Boolean  @default(false)
+  active      Boolean  @default(true)
+  isApproved  Boolean  @default(false)
+  isFeatured  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([userId])
   @@index([productId])
   @@index([serviceId])
   @@index([active])
+  @@index([isApproved, isFeatured])
+  @@index([createdAt])
+}
+
+model SiteSettings {
+  key       String   @id
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
+model ContactInquiry {
+  id        String               @id @default(cuid())
+  name      String
+  phone     String
+  email     String?
+  subject   String
+  message   String               @db.Text
+  status    ContactInquiryStatus @default(NEW)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@index([status, createdAt])
+  @@index([phone])
 }
 
 // 14. Coupons
@@ -396,7 +467,7 @@ model Coupon {
 model Notification {
   id        String           @id @default(cuid())
   userId    String
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Restrict)
   title     String
   message   String
   type      NotificationType @default(SYSTEM)
@@ -410,14 +481,23 @@ model Notification {
 
 // 16. Password Reset Token
 model PasswordResetToken {
-  id        String   @id @default(cuid())
-  email     String
-  token     String   @unique
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String    @id @default(cuid())
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  email       String
+  purpose     PasswordResetPurpose @default(PASSWORD_RESET)
+  tokenHash   String?   @unique
+  otpHash     String
+  expiresAt   DateTime
+  used        Boolean   @default(false)
+  verified    Boolean   @default(false)
+  verifiedAt  DateTime?
+  attemptsUsed Int      @default(0)
+  maxAttempts Int      @default(5)
+  createdAt   DateTime  @default(now())
 
+  @@index([userId])
   @@index([email])
-  @@index([token])
+  @@index([expiresAt])
+  @@index([email, purpose, used, createdAt])
 }
-

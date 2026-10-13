@@ -1,4 +1,5 @@
 import { prisma } from '../lib/db';
+import { getOrderReportRange, type OrderReportPeriod } from '../lib/order-report';
 import { BookingStatus, Role } from '@prisma/client';
 
 export interface AdminBookingFilters {
@@ -6,7 +7,6 @@ export interface AdminBookingFilters {
   serviceId?: string;
   date?: string;
   search?: string;
-  technicianId?: string;
 }
 
 /**
@@ -33,13 +33,13 @@ export async function getAdminDashboardStats() {
     completedRevenue,
   ] = await Promise.all([
     prisma.user.count({ where: { role: 'CUSTOMER' } }),
-    prisma.technician.count(),
+    Promise.resolve(0), // removed technician
     prisma.service.count({ where: { active: true } }),
     prisma.product.count({ where: { active: true } }),
     prisma.serviceBooking.count({ where: { status: 'PENDING' } }),
     prisma.serviceBooking.count({ where: { status: 'CONFIRMED' } }),
-    prisma.serviceBooking.count({ where: { status: 'TECHNICIAN_ASSIGNED' } }),
-    prisma.serviceBooking.count({ where: { status: 'ON_THE_WAY' } }),
+    Promise.resolve(0), // assignedBookings
+    Promise.resolve(0), // onTheWayBookings
     prisma.serviceBooking.count({ where: { status: 'IN_PROGRESS' } }),
     prisma.serviceBooking.count({ where: { status: 'COMPLETED' } }),
     prisma.serviceBooking.count({ where: { status: 'CANCELLED' } }),
@@ -52,11 +52,6 @@ export async function getAdminDashboardStats() {
         user: { select: { id: true, name: true, email: true, phone: true } },
         service: { select: { id: true, name: true, slug: true } },
         address: true,
-        technician: {
-          include: {
-            user: { select: { id: true, name: true, phone: true } },
-          },
-        },
       },
     }),
     prisma.user.findMany({
@@ -128,10 +123,6 @@ export async function getAdminBookings(filters: AdminBookingFilters = {}) {
     where.serviceId = filters.serviceId;
   }
 
-  if (filters.technicianId && filters.technicianId !== 'ALL') {
-    where.technicianId = filters.technicianId;
-  }
-
   if (filters.date) {
     const targetDate = new Date(filters.date);
     if (!isNaN(targetDate.getTime())) {
@@ -161,18 +152,40 @@ export async function getAdminBookings(filters: AdminBookingFilters = {}) {
     where,
     orderBy: { createdAt: 'desc' },
     include: {
-      user: { select: { id: true, name: true, email: true, phone: true } },
-      service: { select: { id: true, name: true, slug: true, inspectionFee: true } },
-      address: true,
-      technician: {
-        include: {
-          user: { select: { id: true, name: true, phone: true } },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
         },
       },
+      service: { select: { id: true, name: true, slug: true, inspectionFee: true } },
+      address: true,
     },
   });
 
   return bookings;
+}
+
+export async function getAdminBookingReport(period: OrderReportPeriod) {
+  const { start, end } = getOrderReportRange(period);
+  return prisma.serviceBooking.findMany({
+    where: { preferredDate: { gte: start, lt: end } },
+    orderBy: [{ preferredDate: 'asc' }, { preferredTimeSlot: 'asc' }, { createdAt: 'asc' }],
+    include: {
+      user: {
+        select: {
+          name: true,
+          email: true,
+          phone: true,
+          currentLocation: true,
+        },
+      },
+      service: { select: { name: true, slug: true, inspectionFee: true } },
+      address: true,
+    },
+  });
 }
 
 /**
@@ -182,14 +195,16 @@ export async function getAdminBookingById(id: string) {
   const booking = await prisma.serviceBooking.findUnique({
     where: { id },
     include: {
-      user: { select: { id: true, name: true, email: true, phone: true } },
-      service: true,
-      address: true,
-      technician: {
-        include: {
-          user: { select: { id: true, name: true, phone: true, email: true } },
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
         },
       },
+      service: true,
+      address: true,
     },
   });
 
@@ -221,77 +236,13 @@ export async function updateAdminBookingStatus(id: string, status: BookingStatus
       user: { select: { id: true, name: true, email: true, phone: true } },
       service: true,
       address: true,
-      technician: {
-        include: {
-          user: { select: { id: true, name: true, phone: true } },
-        },
-      },
     },
   });
 
   return updated;
 }
 
-/**
- * Assign or reassign a technician to a booking
- */
-export async function assignTechnicianToBooking(id: string, technicianId: string | null) {
-  const booking = await prisma.serviceBooking.findUnique({ where: { id } });
-  if (!booking) {
-    throw new Error('Booking not found.');
-  }
 
-  if (technicianId) {
-    const tech = await prisma.technician.findUnique({
-      where: { id: technicianId },
-      include: { user: true },
-    });
-    if (!tech) {
-      throw new Error('Selected technician does not exist.');
-    }
-    if (!tech.active) {
-      throw new Error('Selected technician is currently inactive.');
-    }
-
-    const newStatus: BookingStatus =
-      booking.status === 'PENDING' || booking.status === 'CONFIRMED'
-        ? 'TECHNICIAN_ASSIGNED'
-        : booking.status;
-
-    return prisma.serviceBooking.update({
-      where: { id },
-      data: {
-        technicianId,
-        status: newStatus,
-      },
-      include: {
-        user: { select: { id: true, name: true, email: true, phone: true } },
-        service: true,
-        address: true,
-        technician: {
-          include: {
-            user: { select: { id: true, name: true, phone: true } },
-          },
-        },
-      },
-    });
-  } else {
-    // Unassign technician
-    return prisma.serviceBooking.update({
-      where: { id },
-      data: {
-        technicianId: null,
-        status: booking.status === 'TECHNICIAN_ASSIGNED' ? 'CONFIRMED' : booking.status,
-      },
-      include: {
-        user: { select: { id: true, name: true, email: true, phone: true } },
-        service: true,
-        address: true,
-        technician: true,
-      },
-    });
-  }
-}
 
 /**
  * Update administrative notes or final amount on booking
@@ -306,7 +257,6 @@ export async function updateAdminBookingNotes(
   }
 
   const data: any = {};
-  if (input.technicianNotes !== undefined) data.technicianNotes = input.technicianNotes;
   if (input.customerNotes !== undefined) data.customerNotes = input.customerNotes;
   if (input.finalAmount !== undefined) data.finalAmount = input.finalAmount;
 
@@ -317,87 +267,18 @@ export async function updateAdminBookingNotes(
       user: { select: { id: true, name: true, email: true, phone: true } },
       service: true,
       address: true,
-      technician: {
-        include: {
-          user: { select: { id: true, name: true, phone: true } },
-        },
-      },
     },
   });
 }
 
-/**
- * Get all technicians with details and job workload
- */
-export async function getAdminTechnicians() {
-  const technicians = await prisma.technician.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          role: true,
-        },
-      },
-      _count: {
-        select: {
-          assignedBookings: {
-            where: {
-              status: {
-                in: ['TECHNICIAN_ASSIGNED', 'ON_THE_WAY', 'IN_PROGRESS'],
-              },
-            },
-          },
-        },
-      },
-    },
-  });
 
-  return technicians;
-}
-
-/**
- * Update technician active status, skills, or service areas
- */
-export async function updateAdminTechnician(
-  id: string,
-  input: { active?: boolean; skills?: string[]; serviceAreas?: string[] }
-) {
-  const tech = await prisma.technician.findUnique({ where: { id } });
-  if (!tech) {
-    throw new Error('Technician not found.');
-  }
-
-  const data: any = {};
-  if (input.active !== undefined) data.active = input.active;
-  if (input.skills !== undefined) data.skills = input.skills;
-  if (input.serviceAreas !== undefined) data.serviceAreas = input.serviceAreas;
-
-  return prisma.technician.update({
-    where: { id },
-    data,
-    include: {
-      user: {
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-        },
-      },
-    },
-  });
-}
 
 /**
  * Fetch staff users (TECHNICIAN and ADMIN)
  */
 export async function getAdminStaff(filters: { role?: string; search?: string } = {}) {
   const where: any = {
-    role: { in: ['TECHNICIAN', 'ADMIN'] as Role[] },
+    role: { in: ['ADMIN'] as Role[] },
   };
 
   if (filters.role && filters.role !== 'ALL') {
@@ -410,7 +291,6 @@ export async function getAdminStaff(filters: { role?: string; search?: string } 
       { name: { contains: term, mode: 'insensitive' } },
       { email: { contains: term, mode: 'insensitive' } },
       { phone: { contains: term, mode: 'insensitive' } },
-      { technicianProfile: { employeeCode: { contains: term, mode: 'insensitive' } } },
     ];
   }
 
@@ -426,7 +306,6 @@ export async function getAdminStaff(filters: { role?: string; search?: string } 
       emailVerified: true,
       createdAt: true,
       updatedAt: true,
-      technicianProfile: true,
     },
   });
 
@@ -466,4 +345,16 @@ export async function getAdminCustomers(filters: { search?: string } = {}) {
       },
     },
   });
+}
+
+/**
+ * Permanently delete a booking
+ */
+export async function deleteAdminBooking(id: string) {
+  const existing = await prisma.serviceBooking.findUnique({ where: { id } });
+  if (!existing) {
+    throw new Error('Booking not found.');
+  }
+  await prisma.serviceBooking.delete({ where: { id } });
+  return { success: true };
 }

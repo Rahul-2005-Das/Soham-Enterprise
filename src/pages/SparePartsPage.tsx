@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search,
   Filter,
@@ -17,6 +17,7 @@ import { useCatalog } from '../context/CatalogContext';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
+import { ProductImage } from '../components/ProductImage';
 
 interface SparePartsPageProps {
   onNavigate: (page: PageRoute, params?: { serviceId?: string; productId?: string }) => void;
@@ -37,14 +38,15 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
   const [sortBy, setSortBy] = useState<'popularity' | 'price-low' | 'price-high' | 'rating'>('popularity');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
-  const { products, loading, error } = useCatalog();
+  const { products, categories: catalogCategories, loading, error } = useCatalog();
 
   const itemsPerPage = 6;
 
   // Extract distinct categories and brands
-  const categories = useMemo(() => {
-    return ['All', ...Array.from(new Set(products.map((p) => p.category)))];
-  }, [products]);
+  const categories = useMemo(
+    () => [{ id: 'All', name: 'All' }, ...catalogCategories.map((category) => ({ id: category.id, name: category.name }))],
+    [catalogCategories],
+  );
 
   const brands = useMemo(() => {
     return ['All', ...Array.from(new Set(products.map((p) => p.brand.split('/')[0].trim())))];
@@ -65,7 +67,7 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
       }
 
       // Category
-      if (selectedCategory !== 'All' && product.category !== selectedCategory) {
+      if (selectedCategory !== 'All' && product.categoryId !== selectedCategory) {
         return false;
       }
 
@@ -92,6 +94,12 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
       return b.reviewCount - a.reviewCount; // Popularity
     });
   }, [products, searchQuery, selectedCategory, selectedBrand, priceMax, inStockOnly, sortBy]);
+
+  useEffect(() => {
+    if (selectedCategory !== 'All' && !catalogCategories.some((category) => category.id === selectedCategory)) {
+      setSelectedCategory('All');
+    }
+  }, [catalogCategories, selectedCategory]);
 
   // Pagination calculation
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage) || 1;
@@ -210,21 +218,21 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
               <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                 {categories.map((cat) => (
                   <button
-                    key={cat}
+                    key={cat.id}
                     onClick={() => {
-                      setSelectedCategory(cat);
+                      setSelectedCategory(cat.id);
                       setCurrentPage(1);
                     }}
                     className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition ${
-                      selectedCategory === cat
+                      selectedCategory === cat.id
                         ? 'bg-blue-50 text-blue-700 font-bold'
                         : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span>{cat}</span>
-                    {cat !== 'All' && (
+                    <span>{cat.name}</span>
+                    {cat.id !== 'All' && (
                       <span className="text-[10px] text-slate-400">
-                        {products.filter((p) => p.category === cat).length}
+                        {products.filter((p) => p.categoryId === cat.id).length}
                       </span>
                     )}
                   </button>
@@ -346,7 +354,7 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
                         className="relative h-48 rounded-xl overflow-hidden mb-3 bg-white p-3 cursor-pointer border border-slate-100"
                         onClick={() => onNavigate('product-detail', { productId: part.id })}
                       >
-                        <img
+                        <ProductImage
                           src={part.imageUrl}
                           alt={part.name}
                           className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
@@ -496,17 +504,17 @@ export const SparePartsPage: React.FC<SparePartsPageProps> = ({
               <div className="space-y-1">
                 {categories.map((cat) => (
                   <button
-                    key={cat}
+                    key={cat.id}
                     onClick={() => {
-                      setSelectedCategory(cat);
+                      setSelectedCategory(cat.id);
                       setCurrentPage(1);
                       setMobileFilterOpen(false);
                     }}
                     className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold ${
-                      selectedCategory === cat ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100'
+                      selectedCategory === cat.id ? 'bg-blue-600 text-white' : 'text-slate-700 hover:bg-slate-100'
                     }`}
                   >
-                    {cat}
+                    {cat.name}
                   </button>
                 ))}
               </div>

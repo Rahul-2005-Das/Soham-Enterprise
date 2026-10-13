@@ -10,18 +10,23 @@ const JWT_SECRET = getRequiredEnv('JWT_SECRET');
 export interface AuthSession {
   userId: string;
   email: string;
-  role: 'CUSTOMER' | 'TECHNICIAN' | 'ADMIN';
+  role: 'CUSTOMER' | 'ADMIN';
 }
 
 /**
  * Extracts and verifies the authenticated user session from:
- * 1. An Express request object (checking cookies.auth_token, then authorization header)
+ * 1. An Express request object (checking the route-specific cookie, then authorization header)
  * 2. A raw token or authorization header string
  */
 export function getAuthenticatedUser(reqOrToken?: any): AuthSession | null {
   if (!reqOrToken) return null;
 
   let token: string | null = null;
+  const isAdminRoute = typeof reqOrToken === 'object' && (
+    reqOrToken.originalUrl?.startsWith('/api/admin') ||
+    reqOrToken.url?.startsWith('/api/admin') ||
+    reqOrToken.query?.admin === 'true'
+  );
 
   if (typeof reqOrToken === 'string') {
     token = reqOrToken.startsWith('Bearer ')
@@ -29,9 +34,15 @@ export function getAuthenticatedUser(reqOrToken?: any): AuthSession | null {
       : reqOrToken.trim();
   } else if (typeof reqOrToken === 'object') {
     // Check cookies first
-    if (reqOrToken.cookies && reqOrToken.cookies.auth_token) {
-      token = reqOrToken.cookies.auth_token;
-    } else if (reqOrToken.headers && reqOrToken.headers.authorization) {
+    if (reqOrToken.cookies) {
+      if (isAdminRoute) {
+        token = reqOrToken.cookies.admin_auth_token;
+      } else {
+        token = reqOrToken.cookies.customer_auth_token;
+      }
+    }
+
+    if (!token && reqOrToken.headers && reqOrToken.headers.authorization) {
       const authHeader = reqOrToken.headers.authorization;
       token = authHeader.startsWith('Bearer ')
         ? authHeader.substring(7).trim()
@@ -43,22 +54,16 @@ export function getAuthenticatedUser(reqOrToken?: any): AuthSession | null {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    if (decoded && decoded.userId && decoded.role) {
+    if (decoded && decoded.userId && decoded.role && decoded.email) {
+      if (isAdminRoute ? decoded.role !== 'ADMIN' : decoded.role === 'ADMIN') return null;
       return {
         userId: decoded.userId,
-        email: decoded.email || `${decoded.userId}@customer.sohomenterprises.local`,
+        email: decoded.email,
         role: decoded.role,
       };
     }
   } catch (err) {
-    // Fallback for tests/local mock IDs if passed directly
-    if (process.env.NODE_ENV !== 'production' && token.startsWith('test-user-')) {
-      return {
-        userId: token,
-        email: `${token}@customer.sohomenterprises.local`,
-        role: 'CUSTOMER',
-      };
-    }
+    // Invalid / expired / tampered token: fail closed (no test-token bypass, in any environment).
     return null;
   }
 
@@ -81,7 +86,7 @@ export function requireAuthUser(reqOrToken?: any): AuthSession {
  * Enforces that an operation requires a specific role.
  * Throws an error if user is unauthenticated or has insufficient role.
  */
-export function requireRole(reqOrToken: any, allowedRoles: ('CUSTOMER' | 'TECHNICIAN' | 'ADMIN')[]) {
+export function requireRole(reqOrToken: any, allowedRoles: ('CUSTOMER' | 'ADMIN')[]) {
   const user = requireAuthUser(reqOrToken);
   if (!allowedRoles.includes(user.role)) {
     throw new Error(`Forbidden: Access requires one of [${allowedRoles.join(', ')}] role.`);

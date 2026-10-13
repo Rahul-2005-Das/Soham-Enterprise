@@ -7,15 +7,15 @@ import { getOptionalEnv } from './env.ts';
  * (see .env.example) — no code changes needed.
  */
 export const BUSINESS_CONFIG = {
-  name: 'Sohom Enterprises',
-  phone: getOptionalEnv('BUSINESS_PHONE', '[BUSINESS PHONE]'),
+  name: 'Soham Enterprises',
+  phone: getOptionalEnv('BUSINESS_PHONE', '9088748747'),
   email: getOptionalEnv('BUSINESS_EMAIL', '[BUSINESS EMAIL]'),
   address: getOptionalEnv('BUSINESS_ADDRESS', '[BUSINESS ADDRESS]'),
-  // UPI VPA (Virtual Payment Address), e.g. "sohomenterprises@okhdfcbank"
-  upiVpa: getOptionalEnv('UPI_VPA', '[BUSINESS-UPI-ID]@upi'),
-  upiPayeeName: getOptionalEnv('UPI_PAYEE_NAME', 'Sohom Enterprises'),
+  // Payment recipient details must be explicitly configured, never guessed.
+  upiVpa: getOptionalEnv('UPI_VPA', '[BUSINESS UPI ID]'),
+  upiPayeeName: getOptionalEnv('UPI_PAYEE_NAME', '[UPI PAYEE NAME]'),
 } as const;
 
-export function isUpiConfigured(): boolean {
-  return !BUSINESS_CONFIG.upiVpa.startsWith('[');
+export function isUpiConfigured(upiVpa = BUSINESS_CONFIG.upiVpa): boolean {
+  return !upiVpa.startsWith('[') && /^[\w.-]+@[\w.-]+$/.test(upiVpa);
 }

@@ -4,7 +4,6 @@ import type {
   ServiceCategory,
   Service,
   ServiceBooking,
-  Technician,
   ProductCategory,
   Product,
   ProductImage,
@@ -30,7 +29,6 @@ export type {
   ServiceCategory,
   Service,
   ServiceBooking,
-  Technician,
   ProductCategory,
   Product,
   ProductImage,
@@ -63,7 +61,6 @@ export interface ProductWithDetails extends Product {
 export interface BookingWithDetails extends ServiceBooking {
   service: Service;
   address: Address;
-  technician?: (Technician & { user: Pick<User, 'name' | 'phone' | 'image'> }) | null;
 }
 
 export interface CartWithItems extends Cart {
