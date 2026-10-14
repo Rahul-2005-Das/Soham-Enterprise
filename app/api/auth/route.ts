@@ -17,6 +17,7 @@ import {
   updateUserAddress,
   deleteUserAddress,
   setDefaultUserAddress,
+  OtpEmailDeliveryError,
 } from '../../../actions/auth.ts';
 import {
   registerSchema,
@@ -99,6 +100,12 @@ export async function handleRequestLoginCode(body: any) {
     if (error.name === 'ZodError') {
       return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
     }
+    if (error instanceof OtpEmailDeliveryError) {
+      return {
+        status: 503,
+        body: { success: false, error: 'Unable to send a verification code right now. Please try again later.' },
+      };
+    }
     return { status: 400, body: { error: 'Request could not be processed.' } };
   }
 }
@@ -178,6 +185,12 @@ export async function handleForgotPassword(body: any) {
   } catch (error: any) {
     if (error.name === 'ZodError') {
       return { status: 400, body: { error: isZodError(error) ? zodMessage(error, 'Validation error') : (error.message || 'Validation error') } };
+    }
+    if (error instanceof OtpEmailDeliveryError) {
+      return {
+        status: 503,
+        body: { success: false, error: 'Unable to send a verification code right now. Please try again later.' },
+      };
     }
     return { status: 400, body: { error: error.message || 'Request failed' } };
   }

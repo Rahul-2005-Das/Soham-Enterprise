@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { prisma } from '../lib/db';
 import {
   RegisterInput,
@@ -24,6 +24,14 @@ const JWT_EXPIRES_IN = '7d';
 const RESET_OTP_EXPIRY_MS = 10 * 60 * 1000;
 const RESET_OTP_MAX_ATTEMPTS = 5;
 const RESET_OTP_RESEND_COOLDOWN_MS = 60 * 1000;
+const TEST_RESEND_FROM = 'Soham Enterprises <onboarding@resend.dev>';
+
+export class OtpEmailDeliveryError extends Error {
+  constructor(message: string, readonly statusCode?: number) {
+    super(message);
+    this.name = 'OtpEmailDeliveryError';
+  }
+}
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
@@ -58,24 +66,20 @@ function constantTimeEqual(input: string, expectedHash: string): boolean {
   return crypto.timingSafeEqual(expected, candidate);
 }
 
-function getSmtpTransport() {
-  const host = process.env.SMTP_HOST?.trim();
-  const portValue = process.env.SMTP_PORT?.trim();
-  const port = Number(portValue);
-  const user = process.env.SMTP_USER?.trim();
-  const pass = process.env.SMTP_PASS?.trim();
-  const from = process.env.SMTP_FROM?.trim();
+function getDeliveryErrorDetails(
+  error: unknown,
+  recipientEmail?: string
+): { message: string; statusCode?: number } {
+  const sanitizeMessage = (message: string) =>
+    recipientEmail ? message.replaceAll(recipientEmail, '[recipient]') : message;
 
-  if (!host || !portValue || !Number.isInteger(port) || port < 1 || port > 65535 || !user || !pass || !from) {
-    return null;
+  if (error instanceof OtpEmailDeliveryError) {
+    return { message: sanitizeMessage(error.message), statusCode: error.statusCode };
   }
-
-  return nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-  });
+  if (error instanceof Error) {
+    return { message: sanitizeMessage(error.message) };
+  }
+  return { message: 'Unknown email delivery error.' };
 }
 
 async function sendOtpEmail(
@@ -84,13 +88,26 @@ async function sendOtpEmail(
   name: string,
   purpose: 'PASSWORD_RESET' | 'AUTHENTICATION'
 ) {
-  const transport = getSmtpTransport();
-  if (!transport) {
-    throw new Error('SMTP configuration is missing. Password reset email delivery cannot continue.');
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) {
+    const error = new OtpEmailDeliveryError('Missing required environment variable "RESEND_API_KEY".');
+    console.error('[OTP Email] Resend delivery failed.', getDeliveryErrorDetails(error));
+    throw error;
   }
 
+  const configuredFrom = process.env.RESEND_FROM?.trim();
+  const isTestEnvironment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test';
+  const from = configuredFrom || (isTestEnvironment ? TEST_RESEND_FROM : '');
+  if (!from) {
+    const error = new OtpEmailDeliveryError(
+      'Missing required environment variable "RESEND_FROM". The test sender is available only in development or test.'
+    );
+    console.error('[OTP Email] Resend delivery failed.', getDeliveryErrorDetails(error));
+    throw error;
+  }
+
+  const resend = new Resend(apiKey);
   const customerName = escapeHtml(name?.trim() || 'Customer');
-  const from = process.env.SMTP_FROM!.trim();
   const isAuthentication = purpose === 'AUTHENTICATION';
   const subject = isAuthentication
     ? 'Soham Enterprises - Sign-in Verification Code'
@@ -100,26 +117,49 @@ async function sendOtpEmail(
     ? 'Use this one-time code to sign in or create your customer account.'
     : 'Use the verification code below to complete your password reset.';
 
-  await transport.sendMail({
-    from,
-    to: email,
-    subject,
-    html: `
-      <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1f2937;">
-        <h2 style="margin-bottom: 16px; color: #111827;">${heading}</h2>
-        <p>Hello ${customerName},</p>
-        <p>${instruction}</p>
-        <div style="padding: 20px 24px; margin: 24px 0; background: #f3f4f6; border-radius: 12px; text-align: center;">
-          <div style="font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #6b7280; margin-bottom: 8px;">Verification code</div>
-          <div style="font-size: 36px; font-weight: 700; letter-spacing: 6px; color: #111827;">${otp}</div>
+  try {
+    const { error } = await resend.emails.send({
+      from,
+      to: email,
+      subject,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1f2937;">
+          <h2 style="margin-bottom: 16px; color: #111827;">${heading}</h2>
+          <p>Hello ${customerName},</p>
+          <p>${instruction}</p>
+          <div style="padding: 20px 24px; margin: 24px 0; background: #f3f4f6; border-radius: 12px; text-align: center;">
+            <div style="font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #6b7280; margin-bottom: 8px;">Verification code</div>
+            <div style="font-size: 36px; font-weight: 700; letter-spacing: 6px; color: #111827;">${otp}</div>
+          </div>
+          <p>This code expires in 10 minutes.</p>
+          <p>If you did not request this reset, you can safely ignore this email.</p>
         </div>
-        <p>This code expires in 10 minutes.</p>
-        <p>If you did not request this reset, you can safely ignore this email.</p>
-      </div>
-    `,
-  });
+      `,
+    });
+    if (error) {
+      throw new OtpEmailDeliveryError(error.message, error.statusCode ?? undefined);
+    }
+  } catch (error) {
+    const details = getDeliveryErrorDetails(error, email);
+    console.error('[OTP Email] Resend delivery failed.', details);
+    if (error instanceof OtpEmailDeliveryError) {
+      throw error;
+    }
+    throw new OtpEmailDeliveryError(details.message, details.statusCode);
+  }
 
-  console.info('[OTP Email] Message accepted by SMTP.');
+  console.info('[OTP Email] Message accepted by Resend.');
+}
+
+async function invalidateOtpAfterDeliveryFailure(recordId: string) {
+  try {
+    await prisma.passwordResetToken.update({
+      where: { id: recordId },
+      data: { used: true },
+    });
+  } catch {
+    console.error('[OTP Email] Failed to invalidate an OTP record after delivery failed.');
+  }
 }
 
 export interface SafeUser {
@@ -315,12 +355,9 @@ export async function requestLoginCode(input: RequestLoginCodeInput) {
 
   try {
     await sendOtpEmail(email, otp, user?.name || nameFromEmail(email), 'AUTHENTICATION');
-  } catch {
-    await prisma.passwordResetToken.update({
-      where: { id: record.id },
-      data: { used: true },
-    });
-    console.error('[OTP Email] Delivery failed. Check SMTP configuration and provider status.');
+  } catch (error) {
+    await invalidateOtpAfterDeliveryFailure(record.id);
+    throw error;
   }
 
   return { success: true, message: genericLoginCodeMessage() };
@@ -602,16 +639,8 @@ export async function requestPasswordReset(input: ForgotPasswordInput) {
       message: 'If an account matches this email, a verification code has been sent.',
     };
   } catch (error) {
-    await prisma.passwordResetToken.update({
-      where: { id: resetRecord.id },
-      data: { used: true },
-    });
-
-    console.error('[Reset Email] Delivery failed. Check SMTP configuration and provider status.');
-    return {
-      success: true,
-      message: 'If an account matches this email, a verification code has been sent.',
-    };
+    await invalidateOtpAfterDeliveryFailure(resetRecord.id);
+    throw error;
   }
 }
 
